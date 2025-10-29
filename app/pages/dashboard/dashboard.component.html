@@ -1,0 +1,27 @@
+<div class="dashboard-content">
+  <h2 class="section-title">Dashboard Overview</h2>
+  
+  <!-- Cards Row -->
+  <app-cards [cards]="cards"></app-cards>
+  
+  <!-- Big Card and Table Row -->
+  <div class="cards-row">
+    <div class="card big-card">
+      <div class="card-header">
+        <div class="card-title">Performance Overview</div>
+      </div>
+      <div class="chart-container" style="padding: 0; border: none; box-shadow: none;">
+        <canvas id="performanceChart"></canvas>
+      </div>
+    </div>
+    
+    <app-table [transactions]="transactions" title="Recent Transactions"></app-table>
+  </div>
+  
+  <!-- Charts Row -->
+  <div class="chart-row">
+    <app-charts chartType="sales" title="Sales Overview"></app-charts>
+    <app-charts chartType="traffic" title="Traffic Sources"></app-charts>
+    <app-charts chartType="revenue" title="Revenue by Category"></app-charts>
+  </div>
+</div>

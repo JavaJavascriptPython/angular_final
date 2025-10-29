@@ -1,0 +1,32 @@
+<div class="sidebar" [class.mobile-open]="isMobileMenuOpen">
+  <div class="sidebar-header">
+    <div class="logo">
+      <i class="fas fa-chart-pie"></i>
+      <span class="logo-text">Dashboard</span>
+    </div>
+  </div>
+  
+  <div class="sidebar-menu">
+    <div 
+      *ngFor="let item of menuItems" 
+      class="menu-item" 
+      [class.active]="item.active"
+      (click)="toggleSubmenu(item)">
+      <i class="fas" [class]="item.icon"></i>
+      <span class="menu-text">{{ item.label }}</span>
+      <i *ngIf="item.submenu" class="fas fa-chevron-down ml-auto"></i>
+    </div>
+    
+    <div *ngFor="let item of menuItems">
+      <div *ngIf="item.submenu" class="submenu" [class.open]="item.active">
+        <div 
+          *ngFor="let subItem of item.submenu" 
+          class="submenu-item" 
+          [class.active]="subItem.active"
+          (click)="onSubmenuItemClick()">
+          {{ subItem.label }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

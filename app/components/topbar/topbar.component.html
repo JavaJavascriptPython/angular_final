@@ -1,0 +1,25 @@
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="mobile-toggle" (click)="onMobileToggle()">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div class="search-bar">
+      <i class="fas fa-search"></i>
+      <input type="text" placeholder="Search...">
+    </div>
+  </div>
+  
+  <div class="topbar-right">
+    <button class="theme-toggle" (click)="toggleTheme()">
+      <i class="fas" [class]="getThemeIcon()"></i>
+    </button>
+    <div class="greeting">{{ greeting }}</div>
+    <div class="datetime">
+      <div class="date">{{ currentDate }}</div>
+      <div class="time">{{ currentTime }}</div>
+    </div>
+    <div class="user-profile">
+      <div class="user-avatar">AJ</div>
+    </div>
+  </div>
+</div>

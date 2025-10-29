@@ -1,0 +1,18 @@
+<div class="cards-row">
+  <div 
+    *ngFor="let card of cards" 
+    class="card" 
+    [class.big-card]="bigCard">
+    <div class="card-header">
+      <div class="card-title">{{ card.title }}</div>
+      <div class="card-icon">
+        <i class="fas" [class]="card.icon"></i>
+      </div>
+    </div>
+    <div class="card-value">{{ card.value }}</div>
+    <div class="card-growth" [class.growth-positive]="card.positive" [class.growth-negative]="!card.positive">
+      <i class="fas" [class]="card.positive ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+      {{ card.growth }}
+    </div>
+  </div>
+</div>

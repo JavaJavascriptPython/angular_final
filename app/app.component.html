@@ -1,0 +1,25 @@
+<div class="app-container">
+  <!-- Sidebar -->
+  <app-sidebar 
+    [isMobileMenuOpen]="isMobileMenuOpen"
+    (closeMobileMenu)="closeMobileMenu()">
+  </app-sidebar>
+
+  <!-- Mobile Overlay -->
+  <div 
+    class="mobile-overlay" 
+    [class.active]="isMobileMenuOpen"
+    (click)="closeMobileMenu()">
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Topbar -->
+    <app-topbar (toggleMobileMenu)="toggleMobileMenu()"></app-topbar>
+
+    <!-- Router Outlet -->
+    <div class="router-content">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
+</div>
