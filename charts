@@ -1,0 +1,150 @@
+import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
+import * as echarts from 'echarts';
+
+@Component({
+  selector: 'app-chart',
+  templateUrl: './chart.component.html',
+  styleUrls: ['./chart.component.css']
+})
+export class ChartComponent implements OnInit, OnChanges, OnDestroy {
+  // 👇 Input property receives data from parent
+  @Input() chartData: any;
+
+  // 👇 Will hold our ECharts instance
+  private chartInstance: echarts.ECharts | null = null;
+
+  // 👇 Injecting ElementRef to directly access DOM
+  constructor(private el: ElementRef) {}
+
+  ngOnInit(): void {
+    // Create chart once component is initialized
+    this.initChart();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // When parent sends new data, update chart
+    if (changes['chartData'] && this.chartInstance) {
+      this.updateChart();
+    }
+  }
+
+  private initChart(): void {
+    // Get the native DOM element for the chart container
+    const chartDom = this.el.nativeElement.querySelector('#mainChart');
+
+    // Initialize the chart instance using the DOM element
+    this.chartInstance = echarts.init(chartDom, null, { renderer: 'canvas' }); 
+    // renderer: 'canvas' is faster than 'svg'
+
+    // Set the initial chart options
+    this.updateChart();
+
+    // Handle chart resizing when window size changes
+    window.addEventListener('resize', () => {
+      this.chartInstance?.resize();
+    });
+  }
+
+  private updateChart(): void {
+    if (!this.chartData) return;
+
+    // Basic bar chart configuration
+    const option: echarts.EChartsOption = {
+      title: {
+        text: this.chartData.title || 'Demo Chart',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis'
+      },
+      xAxis: {
+        type: 'category',
+        data: this.chartData.labels || []
+      },
+      yAxis: {
+        type: 'value'
+      },
+      series: [
+        {
+          data: this.chartData.values || [],
+          type: 'bar',
+          smooth: true,
+          itemStyle: {
+            color: '#3b82f6'
+          }
+        }
+      ],
+      animationDuration: 500 // smooth quick render
+    };
+
+    // Apply the configuration to the chart instance
+    this.chartInstance?.setOption(option);
+  }
+
+  ngOnDestroy(): void {
+    // Dispose the chart instance to free memory when component is destroyed
+    this.chartInstance?.dispose();
+  }
+}
+
+
+
+
+
+
+<!-- 
+  The container div for echarts.
+  Set a fixed height (required for ECharts to render).
+-->
+<div id="mainChart" style="width: 100%; height: 400px;"></div>
+
+
+
+
+
+#mainChart {
+  width: 100%;
+  height: 400px;
+}
+
+
+
+
+
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css']
+})
+export class AppComponent {
+  // 👇 This data will be sent to the chart child component
+  chartInfo = {
+    title: 'Monthly Sales',
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    values: [120, 200, 150, 80, 70, 110]
+  };
+
+  // Example: change data dynamically (after 3 sec)
+  ngOnInit() {
+    setTimeout(() => {
+      this.chartInfo = {
+        title: 'Updated Sales',
+        labels: ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        values: [90, 160, 130, 190, 230, 170]
+      };
+    }, 3000);
+  }
+}
+
+
+
+
+
+
+<app-chart *ngIf="chartInfo" [chartData]="chartInfo"></app-chart>
+
+
+<!-- Parent passes chart data to child -->
+<app-chart [chartData]="chartInfo"></app-chart>
