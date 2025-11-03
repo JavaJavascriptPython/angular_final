@@ -1,0 +1,97 @@
+import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
+import * as echarts from 'echarts';
+
+@Component({
+  selector: 'app-chart',
+  templateUrl: './chart.component.html',
+  styleUrls: ['./chart.component.css']
+})
+export class ChartComponent implements OnInit, OnChanges, OnDestroy {
+  
+  // 👇 Input from parent (chart data)
+  @Input() chartData: any;
+
+  // 👇 Holds ECharts instance
+  private chartInstance: any;
+
+  // 👇 Inject ElementRef to access native DOM
+  constructor(private el: ElementRef) {}
+
+  ngOnInit(): void {
+    // Initialize chart when component loads
+    this.initChart();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // If parent updates data later, refresh chart
+    if (changes['chartData'] && this.chartInstance) {
+      this.updateChart();
+    }
+  }
+
+  private initChart(): void {
+    // Get the chart container div from the template
+    var chartDom = this.el.nativeElement.querySelector('#mainChart');
+
+    // Initialize the ECharts instance (use canvas renderer for speed)
+    this.chartInstance = echarts.init(chartDom, null, { renderer: 'canvas' });
+
+    // Draw chart with provided data
+    this.updateChart();
+
+    // Handle browser resize event for responsiveness
+    var that = this;
+    window.addEventListener('resize', function () {
+      if (that.chartInstance) {
+        that.chartInstance.resize();
+      }
+    });
+  }
+
+  private updateChart(): void {
+    if (!this.chartData) {
+      return;
+    }
+
+    // Create chart configuration object
+    var option: any = {
+      title: {
+        text: this.chartData.title || 'Demo Chart',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis'
+      },
+      xAxis: {
+        type: 'category',
+        data: this.chartData.labels || []
+      },
+      yAxis: {
+        type: 'value'
+      },
+      series: [
+        {
+          data: this.chartData.values || [],
+          type: 'bar',
+          smooth: true,
+          itemStyle: {
+            color: '#3b82f6'
+          }
+        }
+      ],
+      animationDuration: 500
+    };
+
+    // Apply chart options
+    if (this.chartInstance) {
+      this.chartInstance.setOption(option);
+    }
+  }
+
+  ngOnDestroy(): void {
+    // Properly destroy ECharts instance to avoid memory leaks
+    if (this.chartInstance) {
+      this.chartInstance.dispose();
+    }
+  }
+}
