@@ -1,0 +1,143 @@
+import { Injectable } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
+import { timer, Subscription } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { JwtHelperService } from '@auth0/angular-jwt';
+import { SessionDialogComponent } from '../dialogs/session-dialog/session-dialog.component';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private jwtHelper = new JwtHelperService();
+  private expiryTimerSub: Subscription | null = null;
+  private warningTimerSub: Subscription | null = null;
+  private dialogOpen = false;
+  private sessionHandled = false;
+
+  private refreshApiUrl = 'https://your-backend.com/api/refresh-token'; // 🔁 Change this
+
+  constructor(
+    private dialog: MatDialog,
+    private router: Router,
+    private http: HttpClient
+  ) {}
+
+  /** Start monitoring JWT token expiry */
+  startTokenMonitor(): void {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+      console.log('[AuthService] No token found.');
+      return;
+    }
+
+    const decoded = this.jwtHelper.decodeToken(token);
+    if (!decoded || !decoded.exp) {
+      console.log('[AuthService] Invalid token.');
+      return;
+    }
+
+    const expiryTime = decoded.exp * 1000;
+    const now = Date.now();
+    const remaining = expiryTime - now;
+    const warningTime = remaining - 2 * 60 * 1000;
+
+    console.log(`[AuthService] Token expires in ${(remaining / 1000 / 60).toFixed(1)} minutes`);
+
+    this.sessionHandled = false;
+    if (this.expiryTimerSub) this.expiryTimerSub.unsubscribe();
+    if (this.warningTimerSub) this.warningTimerSub.unsubscribe();
+
+    if (warningTime <= 0) {
+      this.openExpiryDialog();
+    } else {
+      this.warningTimerSub = timer(warningTime).subscribe(() => {
+        console.log('[AuthService] Warning timer triggered');
+        this.openExpiryDialog();
+      });
+    }
+
+    this.expiryTimerSub = timer(remaining).subscribe(() => {
+      console.log('[AuthService] Token expired');
+      if (!this.sessionHandled) {
+        this.logout();
+      }
+    });
+  }
+
+  /** Open dialog 2 min before expiry */
+  private openExpiryDialog(): void {
+    if (this.dialogOpen) return;
+    this.dialogOpen = true;
+
+    const dialogRef = this.dialog.open(SessionDialogComponent, {
+      disableClose: true,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      this.dialogOpen = false;
+
+      if (result === 'continue') {
+        console.log('[AuthService] User chose to continue session');
+        this.sessionHandled = true;
+        this.refreshToken(); // 🔁 Call refresh API
+      } else {
+        console.log('[AuthService] User chose to logout');
+        this.logout();
+      }
+    });
+  }
+
+  /** Logout user and clear timers */
+  logout(): void {
+    console.log('[AuthService] Logging out');
+
+    this.sessionHandled = true;
+    if (this.expiryTimerSub) this.expiryTimerSub.unsubscribe();
+    if (this.warningTimerSub) this.warningTimerSub.unsubscribe();
+
+    if (this.dialog.openDialogs.length > 0) {
+      this.dialog.closeAll();
+    }
+
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('refresh_token');
+    this.router.navigate(['/login']);
+  }
+
+  /** 🔁 Call backend refresh token API */
+  private refreshToken(): void {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      console.log('[AuthService] No refresh token found.');
+      this.logout();
+      return;
+    }
+
+    const body = { refresh_token: refreshToken };
+
+    console.log('[AuthService] Calling refresh API...');
+
+    this.http.post<{ token: string, refresh_token?: string }>(this.refreshApiUrl, body)
+      .subscribe({
+        next: (response) => {
+          console.log('[AuthService] Token refreshed successfully.');
+
+          // Save new tokens
+          localStorage.setItem('jwt_token', response.token);
+          if (response.refresh_token) {
+            localStorage.setItem('refresh_token', response.refresh_token);
+          }
+
+          // Restart monitor
+          this.startTokenMonitor();
+        },
+        error: (err) => {
+          console.error('[AuthService] Refresh token failed:', err);
+          this.logout();
+        }
+      });
+  }
+}
