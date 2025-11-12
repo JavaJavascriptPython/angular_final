@@ -1,0 +1,122 @@
+<form [formGroup]="dateForm" (ngSubmit)="fetchData()">
+  <mat-form-field appearance="fill">
+    <mat-label>Start Date</mat-label>
+    <input matInput [matDatepicker]="picker1" formControlName="startDate">
+    <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+    <mat-datepicker #picker1></mat-datepicker>
+  </mat-form-field>
+
+  <mat-form-field appearance="fill">
+    <mat-label>End Date</mat-label>
+    <input matInput [matDatepicker]="picker2" formControlName="endDate">
+    <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
+    <mat-datepicker #picker2></mat-datepicker>
+  </mat-form-field>
+
+  <button mat-raised-button color="primary" type="submit">Get Data</button>
+</form>
+
+<!-- Pass data to child -->
+<tps-table [headers]="tableHeaders" [col1]="col1Data" [col2]="col2Data"></tps-table>
+
+
+
+
+
+
+
+
+
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { formatDate } from '@angular/common';
+
+@Component({
+  selector: 'app-report',
+  templateUrl: './report.component.html'
+})
+export class ReportComponent implements OnInit {
+  dateForm!: FormGroup;
+  tableHeaders: string[] = [];
+  col1Data: any[] = [];
+  col2Data: any[] = [];
+
+  constructor(private fb: FormBuilder, private http: HttpClient) {}
+
+  ngOnInit() {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 7);
+
+    this.dateForm = this.fb.group({
+      startDate: [start],
+      endDate: [end]
+    });
+
+    // Auto load last 7 days data
+    this.fetchData();
+  }
+
+  fetchData() {
+    const startDate = formatDate(this.dateForm.value.startDate, 'yyyy-MM-dd', 'en');
+    const endDate = formatDate(this.dateForm.value.endDate, 'yyyy-MM-dd', 'en');
+
+    this.http.get<any>(`https://example.com/api/report?start=${startDate}&end=${endDate}`)
+      .subscribe(res => {
+        this.tableHeaders = res.headers;
+        this.col1Data = res.col1;
+        this.col2Data = res.col2;
+      });
+  }
+}
+
+
+
+
+
+
+
+
+<div class="mat-elevation-z8" *ngIf="headers && col1 && col2">
+  <table mat-table [dataSource]="tableData">
+
+    <ng-container *ngFor="let head of headers; let i = index" [matColumnDef]="head">
+      <th mat-header-cell *matHeaderCellDef>{{ head }}</th>
+      <td mat-cell *matCellDef="let element">{{ element[head] }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="headers"></tr>
+    <tr mat-row *matRowDef="let row; columns: headers;"></tr>
+  </table>
+</div>
+
+
+
+
+
+
+
+
+import { Component, Input, OnChanges } from '@angular/core';
+
+@Component({
+  selector: 'tps-table',
+  templateUrl: './tps-table.component.html'
+})
+export class TpsTableComponent implements OnChanges {
+  @Input() headers: string[] = [];
+  @Input() col1: any[] = [];
+  @Input() col2: any[] = [];
+
+  tableData: any[] = [];
+
+  ngOnChanges() {
+    if (this.headers.length && this.col1.length && this.col2.length) {
+      this.tableData = this.col1.map((v, i) => ({
+        [this.headers[0]]: v,
+        [this.headers[1]]: this.col2[i]
+      }));
+    }
+  }
+}
