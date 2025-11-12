@@ -1,0 +1,140 @@
+<div class="date-form-container">
+  <form [formGroup]="dateForm" (ngSubmit)="fetchData()" class="date-form">
+
+    <!-- Start Date -->
+    <mat-form-field appearance="outline">
+      <mat-label>Start Date</mat-label>
+      <input
+        matInput
+        type="date"
+        formControlName="startDate"
+        (change)="validateDates()"
+        placeholder="Select start date">
+      <mat-error *ngIf="dateError">{{ dateError }}</mat-error>
+    </mat-form-field>
+
+    <!-- End Date -->
+    <mat-form-field appearance="outline">
+      <mat-label>End Date</mat-label>
+      <input
+        matInput
+        type="date"
+        formControlName="endDate"
+        (change)="validateDates()"
+        placeholder="Select end date">
+      <mat-error *ngIf="dateError">{{ dateError }}</mat-error>
+    </mat-form-field>
+
+    <!-- Submit Button -->
+    <button
+      mat-raised-button
+      color="primary"
+      type="submit"
+      [disabled]="!dateForm.valid || !!dateError">
+      Get Data
+    </button>
+  </form>
+
+  <!-- Pass data to child -->
+  <tps-table
+    [headers]="tableHeaders"
+    [col1]="col1Data"
+    [col2]="col2Data">
+  </tps-table>
+</div>
+
+
+
+
+
+
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { formatDate } from '@angular/common';
+
+@Component({
+  selector: 'app-report',
+  templateUrl: './report.component.html',
+  styleUrls: ['./report.component.css']
+})
+export class ReportComponent implements OnInit {
+  dateForm!: FormGroup;
+  dateError: string = '';
+  tableHeaders: string[] = [];
+  col1Data: any[] = [];
+  col2Data: any[] = [];
+
+  constructor(private fb: FormBuilder, private http: HttpClient) {}
+
+  ngOnInit() {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 7);
+
+    this.dateForm = this.fb.group({
+      startDate: [formatDate(start, 'yyyy-MM-dd', 'en'), Validators.required],
+      endDate: [formatDate(end, 'yyyy-MM-dd', 'en'), Validators.required]
+    });
+
+    this.validateDates();
+    this.fetchData(); // Auto-load last 7 days
+  }
+
+  validateDates() {
+    const start = new Date(this.dateForm.value.startDate);
+    const end = new Date(this.dateForm.value.endDate);
+
+    if (start > end) {
+      this.dateError = 'Start date cannot be later than End date.';
+    } else {
+      this.dateError = '';
+    }
+  }
+
+  fetchData() {
+    if (this.dateError) return; // Don't fetch if invalid
+
+    const startDate = this.dateForm.value.startDate;
+    const endDate = this.dateForm.value.endDate;
+
+    this.http
+      .get<any>(`https://example.com/api/report?start=${startDate}&end=${endDate}`)
+      .subscribe(res => {
+        this.tableHeaders = res.headers;
+        this.col1Data = res.col1;
+        this.col2Data = res.col2;
+      });
+  }
+}
+
+
+
+
+
+
+
+.date-form-container {
+  padding: 1rem;
+}
+
+.date-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+mat-form-field {
+  width: 220px;
+}
+
+button {
+  height: 56px;
+}
+
+mat-error {
+  font-size: 0.8rem;
+  color: #d32f2f;
+}
