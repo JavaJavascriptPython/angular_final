@@ -1,0 +1,131 @@
+<div class="date-form-container">
+  <form [formGroup]="dateForm" (ngSubmit)="fetchData()" class="date-form">
+    <!-- Start Date -->
+    <mat-form-field appearance="outline">
+      <mat-label>Start Date</mat-label>
+      <input
+        matInput
+        [matDatepicker]="picker1"
+        formControlName="startDate"
+        placeholder="Select start date">
+      <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+      <mat-datepicker
+        #picker1
+        [datepickerConnectedTo]="viewContainerRef">
+      </mat-datepicker>
+    </mat-form-field>
+
+    <!-- End Date -->
+    <mat-form-field appearance="outline">
+      <mat-label>End Date</mat-label>
+      <input
+        matInput
+        [matDatepicker]="picker2"
+        formControlName="endDate"
+        placeholder="Select end date">
+      <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
+      <mat-datepicker
+        #picker2
+        [datepickerConnectedTo]="viewContainerRef">
+      </mat-datepicker>
+    </mat-form-field>
+
+    <!-- Submit Button -->
+    <button mat-raised-button color="primary" type="submit">
+      Get Data
+    </button>
+  </form>
+
+  <!-- Pass data to child -->
+  <tps-table
+    [headers]="tableHeaders"
+    [col1]="col1Data"
+    [col2]="col2Data">
+  </tps-table>
+</div>
+
+
+
+
+
+
+
+import { Component, OnInit, ViewContainerRef } from '@angular/core';
+import { FormBuilder, FormGroup } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { formatDate } from '@angular/common';
+
+@Component({
+  selector: 'app-report',
+  templateUrl: './report.component.html',
+  styleUrls: ['./report.component.css']
+})
+export class ReportComponent implements OnInit {
+  dateForm!: FormGroup;
+  tableHeaders: string[] = [];
+  col1Data: any[] = [];
+  col2Data: any[] = [];
+
+  constructor(
+    private fb: FormBuilder,
+    private http: HttpClient,
+    public viewContainerRef: ViewContainerRef
+  ) {}
+
+  ngOnInit() {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 7);
+
+    this.dateForm = this.fb.group({
+      startDate: [start],
+      endDate: [end]
+    });
+
+    this.fetchData(); // Load last 7 days automatically
+  }
+
+  fetchData() {
+    const startDate = formatDate(this.dateForm.value.startDate, 'yyyy-MM-dd', 'en');
+    const endDate = formatDate(this.dateForm.value.endDate, 'yyyy-MM-dd', 'en');
+
+    this.http
+      .get<any>(`https://example.com/api/report?start=${startDate}&end=${endDate}`)
+      .subscribe(res => {
+        this.tableHeaders = res.headers;
+        this.col1Data = res.col1;
+        this.col2Data = res.col2;
+      });
+  }
+}
+
+
+
+
+
+
+
+
+/* Container layout */
+.date-form-container {
+  padding: 1rem;
+}
+
+/* Horizontal layout for form */
+.date-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Make each field look consistent */
+mat-form-field {
+  width: 220px;
+}
+
+/* Optional: elevate datepicker overlay */
+.cdk-overlay-container {
+  z-index: 2000 !important;
+}
