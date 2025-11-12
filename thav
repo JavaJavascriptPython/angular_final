@@ -1,42 +1,30 @@
-<div class="date-form-container">
+<div class="report-container">
   <form [formGroup]="dateForm" (ngSubmit)="fetchData()" class="date-form">
-    <!-- Start Date -->
-    <mat-form-field appearance="outline">
-      <mat-label>Start Date</mat-label>
+
+    <div class="form-field">
+      <label for="start">Start Date</label>
       <input
-        matInput
-        [matDatepicker]="picker1"
+        id="start"
+        type="date"
         formControlName="startDate"
-        placeholder="Select start date">
-      <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
-      <mat-datepicker
-        #picker1
-        [datepickerConnectedTo]="viewContainerRef">
-      </mat-datepicker>
-    </mat-form-field>
+        (change)="validateDates()">
+    </div>
 
-    <!-- End Date -->
-    <mat-form-field appearance="outline">
-      <mat-label>End Date</mat-label>
+    <div class="form-field">
+      <label for="end">End Date</label>
       <input
-        matInput
-        [matDatepicker]="picker2"
+        id="end"
+        type="date"
         formControlName="endDate"
-        placeholder="Select end date">
-      <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
-      <mat-datepicker
-        #picker2
-        [datepickerConnectedTo]="viewContainerRef">
-      </mat-datepicker>
-    </mat-form-field>
+        (change)="validateDates()">
+    </div>
 
-    <!-- Submit Button -->
-    <button mat-raised-button color="primary" type="submit">
-      Get Data
-    </button>
+    <button type="submit" [disabled]="!dateForm.valid || dateError">Get Data</button>
   </form>
 
-  <!-- Pass data to child -->
+  <p class="error" *ngIf="dateError">{{ dateError }}</p>
+
+  <!-- child table -->
   <tps-table
     [headers]="tableHeaders"
     [col1]="col1Data"
@@ -49,9 +37,8 @@
 
 
 
-
-import { Component, OnInit, ViewContainerRef } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { formatDate } from '@angular/common';
 
@@ -62,15 +49,12 @@ import { formatDate } from '@angular/common';
 })
 export class ReportComponent implements OnInit {
   dateForm!: FormGroup;
+  dateError = '';
   tableHeaders: string[] = [];
   col1Data: any[] = [];
   col2Data: any[] = [];
 
-  constructor(
-    private fb: FormBuilder,
-    private http: HttpClient,
-    public viewContainerRef: ViewContainerRef
-  ) {}
+  constructor(private fb: FormBuilder, private http: HttpClient) {}
 
   ngOnInit() {
     const end = new Date();
@@ -78,19 +62,33 @@ export class ReportComponent implements OnInit {
     start.setDate(end.getDate() - 7);
 
     this.dateForm = this.fb.group({
-      startDate: [start],
-      endDate: [end]
+      startDate: [formatDate(start, 'yyyy-MM-dd', 'en'), Validators.required],
+      endDate: [formatDate(end, 'yyyy-MM-dd', 'en'), Validators.required]
     });
 
-    this.fetchData(); // Load last 7 days automatically
+    this.validateDates();
+    this.fetchData(); // auto load for last 7 days
+  }
+
+  validateDates() {
+    const start = new Date(this.dateForm.value.startDate);
+    const end = new Date(this.dateForm.value.endDate);
+
+    if (start > end) {
+      this.dateError = 'Start date cannot be later than end date.';
+    } else {
+      this.dateError = '';
+    }
   }
 
   fetchData() {
-    const startDate = formatDate(this.dateForm.value.startDate, 'yyyy-MM-dd', 'en');
-    const endDate = formatDate(this.dateForm.value.endDate, 'yyyy-MM-dd', 'en');
+    if (this.dateError) return;
 
-    this.http
-      .get<any>(`https://example.com/api/report?start=${startDate}&end=${endDate}`)
+    const start = this.dateForm.value.startDate;
+    const end = this.dateForm.value.endDate;
+
+    // Mock API call - replace with actual endpoint
+    this.http.get<any>(`https://example.com/api/report?start=${start}&end=${end}`)
       .subscribe(res => {
         this.tableHeaders = res.headers;
         this.col1Data = res.col1;
@@ -105,27 +103,72 @@ export class ReportComponent implements OnInit {
 
 
 
-
-/* Container layout */
-.date-form-container {
-  padding: 1rem;
+.report-container {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  max-width: 800px;
+  margin: 1.5rem auto;
+  font-family: 'Segoe UI', sans-serif;
 }
 
-/* Horizontal layout for form */
 .date-form {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: flex-end;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
-/* Make each field look consistent */
-mat-form-field {
-  width: 220px;
+.form-field {
+  display: flex;
+  flex-direction: column;
 }
 
-/* Optional: elevate datepicker overlay */
-.cdk-overlay-container {
-  z-index: 2000 !important;
+label {
+  font-weight: 600;
+  color: #0a3d62;
+  margin-bottom: 0.2rem;
+}
+
+input[type="date"] {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input[type="date"]:focus {
+  border-color: #1976d2;
+}
+
+button {
+  background-color: #1976d2;
+  color: white;
+  padding: 0.55rem 1.3rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button:hover:not(:disabled) {
+  background-color: #125ea4;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #d32f2f;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
 }
