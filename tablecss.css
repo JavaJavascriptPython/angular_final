@@ -1,0 +1,149 @@
+/* ===============================
+   TABLE CONTAINER
+   =============================== */
+
+.table-container {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow-x: auto;
+  width: 100%;
+}
+
+/* ===============================
+   TABLE BASE
+   =============================== */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+  font-size: 14px;
+  font-family: "Roboto", "Helvetica Neue", sans-serif;
+}
+
+/* ===============================
+   HEADER
+   =============================== */
+
+.mat-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.mat-header-cell {
+  background-color: #f5f7fa;
+  color: #1f2937;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 12px 10px;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+/* ===============================
+   BODY CELLS
+   =============================== */
+
+.mat-cell {
+  padding: 10px 10px;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+/* Row hover effect */
+.mat-row:hover {
+  background-color: #f9fafb;
+}
+
+/* Zebra striping */
+.mat-row:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* ===============================
+   FOOTER (TOTAL ROW)
+   =============================== */
+
+.mat-footer-row {
+  background-color: #eef2ff;
+}
+
+.mat-footer-cell {
+  padding: 12px 10px;
+  font-weight: 700;
+  color: #1e40af;
+  border-top: 2px solid #c7d2fe;
+  white-space: nowrap;
+}
+
+/* ===============================
+   ALIGNMENT RULES
+   =============================== */
+
+/* Date & Day columns */
+.mat-cell:nth-child(1),
+.mat-cell:nth-child(2),
+.mat-header-cell:nth-child(1),
+.mat-header-cell:nth-child(2),
+.mat-footer-cell:nth-child(1),
+.mat-footer-cell:nth-child(2) {
+  text-align: center;
+}
+
+/* Numeric columns */
+.mat-cell:nth-child(n+3),
+.mat-header-cell:nth-child(n+3),
+.mat-footer-cell:nth-child(n+3) {
+  text-align: right;
+}
+
+/* ===============================
+   OPTIONAL VALUE COLORS
+   =============================== */
+
+.positive {
+  color: #16a34a;
+}
+
+.negative {
+  color: #dc2626;
+}
+
+/* ===============================
+   MATERIAL ELEVATION OVERRIDE
+   =============================== */
+
+.mat-elevation-z2 {
+  box-shadow: none;
+}
+
+/* ===============================
+   RESPONSIVE (MOBILE)
+   =============================== */
+
+@media (max-width: 768px) {
+  table {
+    font-size: 12px;
+    min-width: 600px;
+  }
+
+  .mat-cell,
+  .mat-header-cell,
+  .mat-footer-cell {
+    padding: 6px 6px;
+  }
+}
+
+
+
+
+
+<div class="table-container">
+  <table mat-table [dataSource]="Datasource" class="mat-elevation-z2">
+    <!-- columns -->
+  </table>
+</div>
