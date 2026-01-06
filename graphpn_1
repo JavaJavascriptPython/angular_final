@@ -1,0 +1,294 @@
+<div class="dashboard">
+
+  <div class="card">
+    <h3>Fleet Overview – CPU 95th Percentile</h3>
+    <div id="heatmap" class="chart heatmap"></div>
+  </div>
+
+  <div class="card">
+    <h3>Top Offending Servers (95p)</h3>
+    <div id="comparison" class="chart"></div>
+  </div>
+
+  <div class="card" *ngIf="selectedServer">
+    <h3>Server Deep Dive – {{ selectedServer }}</h3>
+    <div id="deepDive" class="chart"></div>
+  </div>
+
+</div>
+
+
+
+
+
+
+.dashboard {
+  padding: 16px;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+.card {
+  background: #020617;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 0 0 1px #1e293b;
+}
+
+.chart {
+  height: 260px;
+}
+
+.heatmap {
+  height: 320px;
+}
+
+h3 {
+  margin: 6px 0 12px 6px;
+  font-weight: 500;
+}
+
+
+
+
+
+
+import {
+  Component,
+  AfterViewInit,
+  OnDestroy
+} from '@angular/core';
+
+import * as echarts from 'echarts';
+
+@Component({
+  selector: 'app-cpu-dashboard',
+  templateUrl: './cpu-dashboard.component.html',
+  styleUrls: ['./cpu-dashboard.component.css']
+})
+export class CpuDashboardComponent
+  implements AfterViewInit, OnDestroy {
+
+  servers: string[] = [];
+  timeBuckets: string[] = [];
+  metrics: any = {};
+
+  heatmapChart: any;
+  comparisonChart: any;
+  deepDiveChart: any;
+
+  selectedServer: string | null = null;
+
+  /* -----------------------------
+     LIFECYCLE
+  ------------------------------ */
+
+  ngAfterViewInit() {
+    this.generateDummyData();
+    this.initHeatmap();
+    this.initComparison();
+  }
+
+  ngOnDestroy() {
+    this.heatmapChart?.dispose();
+    this.comparisonChart?.dispose();
+    this.deepDiveChart?.dispose();
+  }
+
+  /* -----------------------------
+     DUMMY DATA
+  ------------------------------ */
+
+  generateDummyData() {
+    this.servers = Array.from({ length: 15 }, (_, i) =>
+      `Server-${('0' + (i + 1)).slice(-2)}`
+    );
+
+    this.timeBuckets = Array.from(
+      { length: 12 },
+      (_, i) => `T-${11 - i}`
+    );
+
+    this.servers.forEach(server => {
+      this.metrics[server] = {
+        usr: [],
+        sys: [],
+        iowait: [],
+        p95: []
+      };
+
+      for (let i = 0; i < this.timeBuckets.length; i++) {
+        const usr = this.rand(20, 70);
+        const sys = this.rand(5, 20);
+        const io = this.rand(2, 15);
+        const p95 = Math.min(
+          100,
+          usr + sys + io + this.rand(5, 15)
+        );
+
+        this.metrics[server].usr.push(usr);
+        this.metrics[server].sys.push(sys);
+        this.metrics[server].iowait.push(io);
+        this.metrics[server].p95.push(p95);
+      }
+    });
+  }
+
+  rand(min: number, max: number) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  /* -----------------------------
+     HEATMAP
+  ------------------------------ */
+
+  initHeatmap() {
+    const el = document.getElementById('heatmap');
+    this.heatmapChart = echarts.init(el!);
+
+    const data: any[] = [];
+
+    this.servers.forEach((server, sIdx) => {
+      this.metrics[server].p95.forEach((p95, tIdx) => {
+        data.push({
+          value: [tIdx, sIdx, p95],
+          server,
+          p95,
+          usr: this.metrics[server].usr[tIdx],
+          sys: this.metrics[server].sys[tIdx],
+          iowait: this.metrics[server].iowait[tIdx]
+        });
+      });
+    });
+
+    const option = {
+      tooltip: {
+        formatter: (p) => `
+          <b>${p.data.server}</b><br/>
+          95p: ${p.data.p95}%<br/>
+          usr: ${p.data.usr}%<br/>
+          sys: ${p.data.sys}%<br/>
+          iowait: ${p.data.iowait}%
+        `
+      },
+      grid: { left: 120, right: 20, top: 30, bottom: 40 },
+      xAxis: {
+        type: 'category',
+        data: this.timeBuckets,
+        splitArea: { show: true }
+      },
+      yAxis: {
+        type: 'category',
+        data: this.servers,
+        splitArea: { show: true }
+      },
+      visualMap: {
+        min: 0,
+        max: 100,
+        orient: 'horizontal',
+        bottom: 0,
+        inRange: {
+          color: ['#16a34a', '#facc15', '#fb923c', '#dc2626']
+        }
+      },
+      series: [{
+        type: 'heatmap',
+        data
+      }]
+    };
+
+    this.heatmapChart.setOption(option);
+
+    // CLICK → DEEP DIVE
+    this.heatmapChart.on('click', (params) => {
+      this.openDeepDive(params.data.server);
+    });
+  }
+
+  /* -----------------------------
+     COMPARISON (TOP OFFENDERS)
+  ------------------------------ */
+
+  initComparison() {
+    const el = document.getElementById('comparison');
+    this.comparisonChart = echarts.init(el!);
+
+    const avg = (arr) =>
+      arr.reduce((a, b) => a + b, 0) / arr.length;
+
+    const top3 = this.servers
+      .map(s => ({ s, avg: avg(this.metrics[s].p95) }))
+      .sort((a, b) => b.avg - a.avg)
+      .slice(0, 3)
+      .map(x => x.s);
+
+    const option = {
+      tooltip: { trigger: 'axis' },
+      xAxis: {
+        type: 'category',
+        data: this.timeBuckets
+      },
+      yAxis: {
+        type: 'value',
+        max: 100
+      },
+      series: this.servers.map(server => ({
+        name: server,
+        type: 'line',
+        data: this.metrics[server].p95,
+        lineStyle: {
+          width: top3.includes(server) ? 3 : 1,
+          opacity: top3.includes(server) ? 1 : 0.2
+        }
+      }))
+    };
+
+    this.comparisonChart.setOption(option);
+  }
+
+  /* -----------------------------
+     DEEP DIVE
+  ------------------------------ */
+
+  openDeepDive(server: string) {
+    this.selectedServer = server;
+
+    setTimeout(() => {
+      const el = document.getElementById('deepDive');
+      if (!el) return;
+
+      if (!this.deepDiveChart) {
+        this.deepDiveChart = echarts.init(el);
+      }
+
+      const option = {
+        tooltip: { trigger: 'axis' },
+        legend: {
+          data: ['usr', 'system', 'iowait', '95p']
+        },
+        xAxis: {
+          type: 'category',
+          data: this.timeBuckets
+        },
+        yAxis: {
+          type: 'value',
+          max: 100
+        },
+        series: [
+          { name: 'usr', type: 'line', data: this.metrics[server].usr },
+          { name: 'system', type: 'line', data: this.metrics[server].sys },
+          { name: 'iowait', type: 'line', data: this.metrics[server].iowait },
+          {
+            name: '95p',
+            type: 'line',
+            data: this.metrics[server].p95,
+            lineStyle: { width: 4, type: 'dashed' }
+          }
+        ]
+      };
+
+      this.deepDiveChart.setOption(option);
+    });
+  }
+}
