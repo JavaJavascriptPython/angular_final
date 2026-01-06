@@ -1,0 +1,266 @@
+import { Component, OnInit } from '@angular/core';
+
+@Component({
+  selector: 'app-cpu-dashboard',
+  templateUrl: './cpu-dashboard.component.html',
+  styleUrls: ['./cpu-dashboard.component.css']
+})
+export class CpuDashboardComponent implements OnInit {
+
+  servers: string[] = [];
+  timeBuckets: string[] = [];
+
+  metrics: any = {};
+
+  heatmapOption: any;
+  comparisonOption: any;
+  deepDiveOption: any;
+
+  selectedServer: string | null = null;
+
+  ngOnInit() {
+    this.generateDummyData();
+    this.buildHeatmap();
+    this.buildComparison();
+  }
+
+  /* -----------------------------
+     DUMMY DATA
+  ------------------------------ */
+
+  generateDummyData() {
+    this.servers = Array.from({ length: 15 }, (_, i) =>
+      `Server-${('0' + (i + 1)).slice(-2)}`
+    );
+
+    this.timeBuckets = Array.from({ length: 12 }, (_, i) => `T-${11 - i}`);
+
+    this.servers.forEach(server => {
+      this.metrics[server] = {
+        usr: [],
+        sys: [],
+        iowait: [],
+        p95: []
+      };
+
+      for (let i = 0; i < this.timeBuckets.length; i++) {
+        const usr = this.rand(20, 70);
+        const sys = this.rand(5, 20);
+        const io = this.rand(2, 15);
+        const p95 = Math.min(100, usr + sys + io + this.rand(5, 15));
+
+        this.metrics[server].usr.push(usr);
+        this.metrics[server].sys.push(sys);
+        this.metrics[server].iowait.push(io);
+        this.metrics[server].p95.push(p95);
+      }
+    });
+  }
+
+  rand(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  /* -----------------------------
+     HEATMAP
+  ------------------------------ */
+
+  buildHeatmap() {
+    const data = [];
+
+    this.servers.forEach((server, sIdx) => {
+      this.metrics[server].p95.forEach((p95, tIdx) => {
+        data.push({
+          value: [tIdx, sIdx, p95],
+          server,
+          p95,
+          usr: this.metrics[server].usr[tIdx],
+          sys: this.metrics[server].sys[tIdx],
+          iowait: this.metrics[server].iowait[tIdx]
+        });
+      });
+    });
+
+    this.heatmapOption = {
+      tooltip: {
+        formatter: (p) => `
+          <b>${p.data.server}</b><br/>
+          95p: ${p.data.p95}%<br/>
+          usr: ${p.data.usr}%<br/>
+          sys: ${p.data.sys}%<br/>
+          iowait: ${p.data.iowait}%
+        `
+      },
+      grid: { left: 120, top: 30, right: 20, bottom: 40 },
+      xAxis: {
+        type: 'category',
+        data: this.timeBuckets,
+        splitArea: { show: true }
+      },
+      yAxis: {
+        type: 'category',
+        data: this.servers,
+        splitArea: { show: true }
+      },
+      visualMap: {
+        min: 0,
+        max: 100,
+        orient: 'horizontal',
+        bottom: 0,
+        inRange: {
+          color: ['#16a34a', '#facc15', '#fb923c', '#dc2626']
+        }
+      },
+      series: [{
+        type: 'heatmap',
+        data,
+        emphasis: {
+          itemStyle: {
+            borderColor: '#000',
+            borderWidth: 1
+          }
+        }
+      }]
+    };
+  }
+
+  /* -----------------------------
+     COMPARISON (TOP OFFENDERS)
+  ------------------------------ */
+
+  buildComparison() {
+    const serverAvg = this.servers.map(s => ({
+      name: s,
+      avg: this.avg(this.metrics[s].p95)
+    })).sort((a, b) => b.avg - a.avg);
+
+    const top3 = serverAvg.slice(0, 3).map(s => s.name);
+
+    this.comparisonOption = {
+      tooltip: { trigger: 'axis' },
+      xAxis: {
+        type: 'category',
+        data: this.timeBuckets
+      },
+      yAxis: {
+        type: 'value',
+        max: 100
+      },
+      series: this.servers.map(server => ({
+        name: server,
+        type: 'line',
+        data: this.metrics[server].p95,
+        lineStyle: {
+          width: top3.includes(server) ? 3 : 1,
+          opacity: top3.includes(server) ? 1 : 0.2
+        }
+      }))
+    };
+  }
+
+  avg(arr) {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+
+  /* -----------------------------
+     DEEP DIVE
+  ------------------------------ */
+
+  openDeepDive(server: string) {
+    this.selectedServer = server;
+
+    this.deepDiveOption = {
+      tooltip: { trigger: 'axis' },
+      legend: { data: ['usr', 'system', 'iowait', '95p'] },
+      xAxis: {
+        type: 'category',
+        data: this.timeBuckets
+      },
+      yAxis: {
+        type: 'value',
+        max: 100
+      },
+      series: [
+        { name: 'usr', type: 'line', data: this.metrics[server].usr },
+        { name: 'system', type: 'line', data: this.metrics[server].sys },
+        { name: 'iowait', type: 'line', data: this.metrics[server].iowait },
+        {
+          name: '95p',
+          type: 'line',
+          data: this.metrics[server].p95,
+          lineStyle: { width: 4, type: 'dashed' }
+        }
+      ]
+    };
+  }
+}
+
+
+
+
+
+
+
+
+
+<div class="dashboard">
+
+  <!-- Fleet Overview -->
+  <div class="card">
+    <h3>Fleet Overview – CPU 95th Percentile</h3>
+    <div echarts [options]="heatmapOption"
+         (chartClick)="openDeepDive($event.data.server)"
+         class="chart heatmap">
+    </div>
+  </div>
+
+  <!-- Comparison -->
+  <div class="card">
+    <h3>Top Offending Servers</h3>
+    <div echarts [options]="comparisonOption"
+         class="chart">
+    </div>
+  </div>
+
+  <!-- Deep Dive -->
+  <div class="card" *ngIf="selectedServer">
+    <h3>Server Deep Dive – {{ selectedServer }}</h3>
+    <div echarts [options]="deepDiveOption"
+         class="chart">
+    </div>
+  </div>
+
+</div>
+
+
+
+
+
+
+
+.dashboard {
+  padding: 16px;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+.card {
+  background: #020617;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 0 0 1px #1e293b;
+}
+
+.chart {
+  height: 260px;
+}
+
+.heatmap {
+  height: 320px;
+}
+
+h3 {
+  margin: 6px 0 12px 6px;
+  font-weight: 500;
+}
