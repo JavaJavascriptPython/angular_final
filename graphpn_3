@@ -1,0 +1,256 @@
+import { Component, OnInit } from '@angular/core';
+declare const echarts: any;
+
+interface ServerMetrics {
+  p95: number[];
+  usr: number[];
+  system: number[];
+  waitIO: number[];
+}
+
+interface Server {
+  name: string;
+  metrics: ServerMetrics;
+}
+
+@Component({
+  selector: 'app-cpu-dashboard',
+  templateUrl: './cpu-dashboard.component.html',
+  styleUrls: ['./cpu-dashboard.component.css']
+})
+export class CpuDashboardComponent implements OnInit {
+
+  categories = ['app', 'dev', 'gateway', 'db'];
+  selectedCategory = 'app';
+
+  serversByCategory: { [key: string]: Server[] } = {};
+  visibleServers: Server[] = [];
+  excludedServers = new Set<string>();
+
+  heatmapChart: any;
+  lineChart: any;
+
+  timeLabels = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00'];
+
+  ngOnInit() {
+    this.generateDummyData();
+    this.onCategoryChange();
+  }
+
+  generateDummyData() {
+    const genMetrics = (): ServerMetrics => ({
+      p95: this.rand(),
+      usr: this.rand(),
+      system: this.rand(),
+      waitIO: this.rand()
+    });
+
+    this.categories.forEach(cat => {
+      this.serversByCategory[cat] = [];
+      for (let i = 1; i <= 4; i++) {
+        this.serversByCategory[cat].push({
+          name: `${cat}-srv-${i}`,
+          metrics: genMetrics()
+        });
+      }
+    });
+  }
+
+  rand(): number[] {
+    return Array.from({ length: 6 }, () => Math.floor(20 + Math.random() * 70));
+  }
+
+  onCategoryChange() {
+    this.excludedServers.clear();
+    this.visibleServers = this.serversByCategory[this.selectedCategory];
+    setTimeout(() => {
+      this.renderHeatmap();
+      this.renderLineChart();
+    });
+  }
+
+  toggleServer(serverName: string) {
+    if (this.excludedServers.has(serverName)) {
+      this.excludedServers.delete(serverName);
+    } else {
+      this.excludedServers.add(serverName);
+    }
+    this.renderHeatmap();
+  }
+
+  renderHeatmap() {
+    if (!this.heatmapChart) {
+      this.heatmapChart = echarts.init(document.getElementById('heatmap'));
+    }
+
+    const servers = this.visibleServers.filter(
+      s => !this.excludedServers.has(s.name)
+    );
+
+    const data = [];
+    servers.forEach((srv, y) => {
+      srv.metrics.p95.forEach((val, x) => {
+        data.push([x, y, val]);
+      });
+    });
+
+    this.heatmapChart.setOption({
+      tooltip: {},
+      grid: { top: 30 },
+      xAxis: {
+        type: 'category',
+        data: this.timeLabels
+      },
+      yAxis: {
+        type: 'category',
+        data: servers.map(s => s.name)
+      },
+      visualMap: {
+        min: 0,
+        max: 100,
+        orient: 'horizontal',
+        left: 'center',
+        bottom: 0
+      },
+      series: [{
+        type: 'heatmap',
+        data: data
+      }]
+    });
+  }
+
+  renderLineChart() {
+    if (!this.lineChart) {
+      this.lineChart = echarts.init(document.getElementById('linechart'));
+    }
+
+    const series = [];
+
+    this.visibleServers.forEach(server => {
+      const m = server.metrics;
+      series.push(
+        { name: `${server.name} p95`, type: 'line', data: m.p95 },
+        { name: `${server.name} usr`, type: 'line', data: m.usr },
+        { name: `${server.name} system`, type: 'line', data: m.system },
+        { name: `${server.name} waitIO`, type: 'line', data: m.waitIO }
+      );
+    });
+
+    this.lineChart.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { type: 'scroll' },
+      xAxis: {
+        type: 'category',
+        data: this.timeLabels
+      },
+      yAxis: { type: 'value', max: 100 },
+      series
+    });
+  }
+}
+
+
+
+
+
+
+
+<div class="dashboard">
+
+  <!-- Category Selector -->
+  <div class="controls">
+    <label>Category</label>
+    <select [(ngModel)]="selectedCategory" (change)="onCategoryChange()">
+      <option *ngFor="let c of categories" [value]="c">
+        {{ c | uppercase }}
+      </option>
+    </select>
+  </div>
+
+  <!-- Server Strip -->
+  <div class="server-strip">
+    <span
+      *ngFor="let s of visibleServers"
+      (click)="toggleServer(s.name)"
+      [class.excluded]="excludedServers.has(s.name)">
+      {{ s.name }}
+    </span>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="card">
+    <h3>CPU P95 Heatmap</h3>
+    <div id="heatmap" class="heatmap"></div>
+  </div>
+
+  <!-- Line Chart -->
+  <div class="card">
+    <h3>Detailed CPU Metrics</h3>
+    <div id="linechart" class="chart"></div>
+  </div>
+
+</div>
+
+
+
+
+
+
+
+
+.dashboard {
+  padding: 16px;
+  background: #0b1220;
+  color: #e5e7eb;
+  font-family: system-ui, sans-serif;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+select {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  padding: 4px 8px;
+}
+
+.server-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.server-strip span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #111827;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.server-strip span.excluded {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
+.card {
+  margin-bottom: 18px;
+}
+
+.card h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.chart {
+  height: 260px;
+}
+
+.heatmap {
+  height: 300px;
+}
