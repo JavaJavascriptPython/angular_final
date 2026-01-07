@@ -1,0 +1,297 @@
+import {
+  Component,
+  AfterViewInit,
+  OnDestroy
+} from '@angular/core';
+import * as echarts from 'echarts';
+
+@Component({
+  selector: 'app-cpu-dashboard',
+  templateUrl: './cpu-dashboard.component.html',
+  styleUrls: ['./cpu-dashboard.component.css']
+})
+export class CpuDashboardComponent
+  implements AfterViewInit, OnDestroy {
+
+  /* -----------------------------
+     SERVER CATEGORIES
+  ------------------------------ */
+
+  serverCatalog = {
+    APP: ['App-01', 'App-02', 'App-03', 'App-04', 'App-05'],
+    DEV: ['Dev-01', 'Dev-02', 'Dev-03'],
+    GATEWAY: ['Gw-01', 'Gw-02', 'Gw-03'],
+    DB: ['Db-01', 'Db-02', 'Db-03', 'Db-04']
+  };
+
+  selectedCategory = 'APP';
+  visibleServers: string[] = [];
+  excludedServers = new Set<string>();
+
+  /* -----------------------------
+     TIME AXIS
+  ------------------------------ */
+
+  timeBuckets: string[] = [
+    '10:00', '10:05', '10:10', '10:15',
+    '10:20', '10:25', '10:30', '10:35',
+    '10:40', '10:45', '10:50', '10:55'
+  ];
+
+  /* -----------------------------
+     METRICS (INPUT ARRAYS)
+  ------------------------------ */
+
+  metrics: any = {
+    'App-01': {
+      p95: [72, 75, 78, 80, 85, 88, 90, 87, 84, 82, 78, 76],
+      usr: [45, 47, 48, 50, 52, 55, 56, 54, 53, 50, 48, 47],
+      sys: [12, 13, 14, 15, 16, 17, 18, 17, 16, 15, 14, 13],
+      iowait: [5, 6, 6, 7, 8, 9, 10, 9, 8, 7, 6, 6]
+    },
+    'App-02': {
+      p95: [60, 62, 65, 67, 68, 70, 72, 71, 69, 66, 64, 62],
+      usr: [38, 39, 40, 42, 43, 44, 45, 44, 43, 41, 40, 39],
+      sys: [10, 11, 11, 12, 13, 13, 14, 13, 12, 12, 11, 11],
+      iowait: [4, 4, 5, 5, 6, 6, 7, 6, 6, 5, 5, 4]
+    },
+
+    // --- repeat same structure for all servers ---
+  };
+
+  /* -----------------------------
+     CHART INSTANCES
+  ------------------------------ */
+
+  heatmapChart: any;
+  comparisonChart: any;
+  deepDiveChart: any;
+
+  selectedServer: string | null = null;
+
+  /* -----------------------------
+     LIFECYCLE
+  ------------------------------ */
+
+  ngAfterViewInit() {
+    this.applyCategory();
+  }
+
+  ngOnDestroy() {
+    this.heatmapChart?.dispose();
+    this.comparisonChart?.dispose();
+    this.deepDiveChart?.dispose();
+  }
+
+  /* -----------------------------
+     CATEGORY HANDLING
+  ------------------------------ */
+
+  onCategoryChange(category: string) {
+    this.selectedCategory = category;
+    this.excludedServers.clear();
+    this.selectedServer = null;
+    this.applyCategory();
+  }
+
+  applyCategory() {
+    this.visibleServers = this.serverCatalog[this.selectedCategory];
+    this.renderHeatmap();
+    this.renderComparison();
+  }
+
+  toggleServer(server: string) {
+    this.excludedServers.has(server)
+      ? this.excludedServers.delete(server)
+      : this.excludedServers.add(server);
+
+    this.renderHeatmap();
+    this.renderComparison();
+  }
+
+  getActiveServers() {
+    return this.visibleServers.filter(
+      s => !this.excludedServers.has(s)
+    );
+  }
+
+  /* -----------------------------
+     HEATMAP (95p ONLY)
+  ------------------------------ */
+
+  renderHeatmap() {
+    const el = document.getElementById('heatmap');
+    if (!this.heatmapChart) {
+      this.heatmapChart = echarts.init(el!);
+    }
+
+    const activeServers = this.getActiveServers();
+    const data: any[] = [];
+
+    activeServers.forEach((server, sIdx) => {
+      this.metrics[server].p95.forEach((val, tIdx) => {
+        data.push({
+          value: [tIdx, sIdx, val],
+          server,
+          p95: val,
+          usr: this.metrics[server].usr[tIdx],
+          sys: this.metrics[server].sys[tIdx],
+          iowait: this.metrics[server].iowait[tIdx]
+        });
+      });
+    });
+
+    this.heatmapChart.setOption({
+      tooltip: {
+        formatter: (p) => `
+          <b>${p.data.server}</b><br/>
+          95p: ${p.data.p95}%<br/>
+          usr: ${p.data.usr}%<br/>
+          sys: ${p.data.sys}%<br/>
+          iowait: ${p.data.iowait}%
+        `
+      },
+      grid: { left: 120, right: 20, top: 30, bottom: 40 },
+      xAxis: { type: 'category', data: this.timeBuckets },
+      yAxis: { type: 'category', data: activeServers },
+      visualMap: {
+        min: 0,
+        max: 100,
+        bottom: 0,
+        orient: 'horizontal',
+        inRange: {
+          color: ['#16a34a', '#facc15', '#fb923c', '#dc2626']
+        }
+      },
+      series: [{ type: 'heatmap', data }]
+    });
+
+    this.heatmapChart.off('click');
+    this.heatmapChart.on('click', p =>
+      this.openDeepDive(p.data.server)
+    );
+  }
+
+  /* -----------------------------
+     COMPARISON (95p)
+  ------------------------------ */
+
+  renderComparison() {
+    const el = document.getElementById('comparison');
+    if (!this.comparisonChart) {
+      this.comparisonChart = echarts.init(el!);
+    }
+
+    const activeServers = this.getActiveServers();
+
+    const avg = (a: number[]) =>
+      a.reduce((x, y) => x + y, 0) / a.length;
+
+    const top3 = [...activeServers]
+      .map(s => ({ s, v: avg(this.metrics[s].p95) }))
+      .sort((a, b) => b.v - a.v)
+      .slice(0, 3)
+      .map(x => x.s);
+
+    this.comparisonChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: this.timeBuckets },
+      yAxis: { type: 'value', max: 100 },
+      series: activeServers.map(server => ({
+        name: server,
+        type: 'line',
+        data: this.metrics[server].p95,
+        lineStyle: {
+          width: top3.includes(server) ? 3 : 1,
+          opacity: top3.includes(server) ? 1 : 0.2
+        }
+      }))
+    });
+  }
+
+  /* -----------------------------
+     DEEP DIVE (ALL 4 METRICS)
+  ------------------------------ */
+
+  openDeepDive(server: string) {
+    this.selectedServer = server;
+
+    setTimeout(() => {
+      const el = document.getElementById('deepDive');
+      if (!this.deepDiveChart) {
+        this.deepDiveChart = echarts.init(el!);
+      }
+
+      this.deepDiveChart.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['usr', 'system', 'iowait', '95p'] },
+        xAxis: { type: 'category', data: this.timeBuckets },
+        yAxis: { type: 'value', max: 100 },
+        series: [
+          { name: 'usr', type: 'line', data: this.metrics[server].usr },
+          { name: 'system', type: 'line', data: this.metrics[server].sys },
+          { name: 'iowait', type: 'line', data: this.metrics[server].iowait },
+          {
+            name: '95p',
+            type: 'line',
+            data: this.metrics[server].p95,
+            lineStyle: { width: 4, type: 'dashed' }
+          }
+        ]
+      });
+    });
+  }
+}
+
+
+
+
+
+
+
+<div class="dashboard">
+
+  <div class="controls">
+    <label>
+      Category:
+      <select (change)="onCategoryChange($event.target.value)">
+        <option value="APP">App Servers</option>
+        <option value="DEV">Development Servers</option>
+        <option value="GATEWAY">Gateway Servers</option>
+        <option value="DB">Database Servers</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="server-strip">
+    <span *ngFor="let s of visibleServers"
+          (click)="toggleServer(s)"
+          [class.excluded]="excludedServers.has(s)">
+      {{ s }}
+    </span>
+  </div>
+
+  <div class="card">
+    <h3>Fleet Overview – CPU 95th Percentile</h3>
+    <div id="heatmap" class="chart heatmap"></div>
+  </div>
+
+  <div class="card">
+    <h3>Top Offending Servers</h3>
+    <div id="comparison" class="chart"></div>
+  </div>
+
+  <div class="card" *ngIf="selectedServer">
+    <h3>Server Deep Dive – {{ selectedServer }}</h3>
+    <div id="deepDive" class="chart"></div>
+  </div>
+
+</div>
+
+
+
+
+
+
+
+
