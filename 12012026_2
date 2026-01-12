@@ -1,0 +1,209 @@
+@Component({
+  selector: 'app-monitoring',
+  templateUrl: './monitoring.component.html',
+  styleUrls: ['./monitoring.component.css']
+})
+export class MonitoringComponent implements OnInit {
+
+  selectedCategory = 'APP';
+  alertFilter = 'ALL'; // ALL | WARNING | CRITICAL
+
+  serverCatalog = {
+    APP: ['App-01', 'App-02', 'App-03'],
+    DEV: ['Dev-01', 'Dev-02'],
+    DB: ['DB-01', 'DB-02']
+  };
+
+  mountPointsByCategory: any = {
+    APP: ['/', '/var', '/data'],
+    DEV: ['/', '/home'],
+    DB: ['/', '/data', '/backup']
+  };
+
+  memoryUsage: any = {
+    APP: {
+      '/': { 'App-01': 62, 'App-02': 70, 'App-03': 55 },
+      '/var': { 'App-01': 81, 'App-02': 76, 'App-03': 68 },
+      '/data': { 'App-01': 92, 'App-02': 84, 'App-03': 79 }
+    },
+    DEV: {
+      '/': { 'Dev-01': 45, 'Dev-02': 51 },
+      '/home': { 'Dev-01': 67, 'Dev-02': 88 }
+    },
+    DB: {
+      '/': { 'DB-01': 72, 'DB-02': 69 },
+      '/data': { 'DB-01': 91, 'DB-02': 86 },
+      '/backup': { 'DB-01': 64, 'DB-02': 58 }
+    }
+  };
+
+  visibleServers: string[] = [];
+  displayedColumns: string[] = [];
+  memoryTableData: any[] = [];
+  filteredTableData: any[] = [];
+
+  ngOnInit() {
+    this.applyCategory();
+  }
+
+  applyCategory() {
+    this.visibleServers = this.serverCatalog[this.selectedCategory];
+    this.buildMemoryTable();
+    this.applyAlertFilter();
+  }
+
+  buildMemoryTable() {
+    const mounts = this.mountPointsByCategory[this.selectedCategory];
+    this.displayedColumns = ['mount', ...this.visibleServers];
+
+    this.memoryTableData = mounts.map(mp => {
+      const row: any = { mount: mp };
+
+      this.visibleServers.forEach(server => {
+        row[server] =
+          this.memoryUsage[this.selectedCategory]?.[mp]?.[server] ?? null;
+      });
+
+      return row;
+    });
+  }
+
+  applyAlertFilter() {
+    if (this.alertFilter === 'ALL') {
+      this.filteredTableData = this.memoryTableData;
+      return;
+    }
+
+    this.filteredTableData = this.memoryTableData.filter(row =>
+      this.visibleServers.some(server => {
+        const val = row[server];
+        if (val == null) return false;
+
+        if (this.alertFilter === 'CRITICAL') return val >= 90;
+        if (this.alertFilter === 'WARNING') return val >= 75;
+        return false;
+      })
+    );
+  }
+
+  getUsageClass(val: number) {
+    if (val >= 90) return 'critical';
+    if (val >= 75) return 'warning';
+    return 'normal';
+  }
+
+  getAlertIcon(val: number) {
+    if (val >= 90) return '🔴';
+    if (val >= 75) return '🟡';
+    return '';
+  }
+}
+
+
+
+
+<div class="controls">
+  <select [(ngModel)]="selectedCategory" (change)="applyCategory()">
+    <option value="APP">App Servers</option>
+    <option value="DEV">Dev Servers</option>
+    <option value="DB">Database Servers</option>
+  </select>
+
+  <select [(ngModel)]="alertFilter" (change)="applyAlertFilter()">
+    <option value="ALL">All</option>
+    <option value="WARNING">Warning & Critical</option>
+    <option value="CRITICAL">Critical Only</option>
+  </select>
+</div>
+
+<div class="card">
+  <h3>Disk Usage by Mount Point</h3>
+
+  <table mat-table [dataSource]="filteredTableData" class="memory-table">
+
+    <!-- Mount column -->
+    <ng-container matColumnDef="mount">
+      <th mat-header-cell *matHeaderCellDef>Mount</th>
+      <td mat-cell *matCellDef="let row">{{ row.mount }}</td>
+    </ng-container>
+
+    <!-- Server columns -->
+    <ng-container *ngFor="let server of visibleServers"
+                  [matColumnDef]="server">
+
+      <th mat-header-cell *matHeaderCellDef>{{ server }}</th>
+
+      <td mat-cell *matCellDef="let row"
+          [ngClass]="getUsageClass(row[server])">
+        {{ getAlertIcon(row[server]) }}
+        {{ row[server] }}%
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+  </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+.controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+select {
+  background: #020617;
+  color: #e5e7eb;
+  border: 1px solid #1e293b;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.card {
+  background: #020617;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.memory-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+.memory-table th {
+  color: #94a3b8;
+  font-weight: 500;
+  padding: 6px;
+}
+
+.memory-table td {
+  padding: 6px;
+}
+
+.memory-table tr:hover {
+  background: #020617;
+}
+
+.normal {
+  color: #86efac;
+}
+
+.warning {
+  color: #facc15;
+}
+
+.critical {
+  color: #f87171;
+  font-weight: 600;
+}
