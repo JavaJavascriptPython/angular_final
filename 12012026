@@ -1,52 +1,378 @@
-generateTimeBucketsForDays(days: number): string[] {
-  const buckets: string[] = [];
-  const now = new Date();
+import {
+  Component,
+  OnInit,
+  AfterViewInit,
+  OnDestroy
+} from '@angular/core';
+import * as echarts from 'echarts';
 
-  for (let d = days - 1; d >= 0; d--) {
-    const day = new Date(now);
-    day.setDate(now.getDate() - d);
-    day.setHours(0, 0, 0, 0);
+@Component({
+  selector: 'app-cpu-dashboard',
+  templateUrl: './cpu-dashboard.component.html',
+  styleUrls: ['./cpu-dashboard.component.css']
+})
+export class CpuDashboardComponent
+  implements OnInit, AfterViewInit, OnDestroy {
 
-    for (let h = 0; h < 24; h++) {
-      for (let m = 0; m < 60; m += 5) {
+  /* -----------------------------
+     SERVER CATALOG
+  ------------------------------ */
 
-        // Show label only at hour boundary
-        if (m === 0) {
-          // Midnight → show date + time
-          if (h === 0) {
-            buckets.push(
-              day.toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short'
-              }) + ' 00:00'
-            );
+  serverCatalog = {
+    APP: ['App-01', 'App-02', 'App-03'],
+    DEV: ['Dev-01', 'Dev-02'],
+    GATEWAY: ['Gw-01'],
+    DB: ['Db-01', 'Db-02']
+  };
+
+  selectedCategory = 'APP';
+  visibleServers: string[] = [];
+  excludedServers = new Set<string>();
+
+  /* -----------------------------
+     TIME RANGE
+  ------------------------------ */
+
+  timeRange: '1d' | '3d' | '7d' = '1d';
+  timeBuckets: string[] = [];
+
+  /* -----------------------------
+     FLEET METRIC
+  ------------------------------ */
+
+  fleetMetric: 'p95' | 'usr' | 'sys' | 'iowait' = 'p95';
+
+  fleetMetricLabels = {
+    p95: '95th Percentile',
+    usr: 'User CPU',
+    sys: 'System CPU',
+    iowait: 'IO Wait'
+  };
+
+  /* -----------------------------
+     METRICS (DUMMY DATA)
+  ------------------------------ */
+
+  metrics: any = {
+    'App-01': {
+      p95: this.fake(288),
+      usr: this.fake(288),
+      sys: this.fake(288),
+      iowait: this.fake(288)
+    },
+    'App-02': {
+      p95: this.fake(288),
+      usr: this.fake(288),
+      sys: this.fake(288),
+      iowait: this.fake(288)
+    },
+    'App-03': {
+      p95: this.fake(288),
+      usr: this.fake(288),
+      sys: this.fake(288),
+      iowait: this.fake(288)
+    }
+  };
+
+  /* -----------------------------
+     CHARTS
+  ------------------------------ */
+
+  heatmapChart: any;
+  comparisonChart: any;
+  deepDiveChart: any;
+  selectedServer: string | null = null;
+
+  /* -----------------------------
+     LIFECYCLE
+  ------------------------------ */
+
+  ngOnInit() {
+    this.applyCategory();
+    this.timeBuckets = this.generateTimeBucketsForDays(1);
+  }
+
+  ngAfterViewInit() {}
+
+  ngOnDestroy() {
+    this.heatmapChart?.dispose();
+    this.comparisonChart?.dispose();
+    this.deepDiveChart?.dispose();
+  }
+
+  /* -----------------------------
+     UI HANDLERS
+  ------------------------------ */
+
+  onCategoryChange(cat: string) {
+    this.selectedCategory = cat;
+    this.excludedServers.clear();
+    this.selectedServer = null;
+    this.applyCategory();
+  }
+
+  onFleetMetricChange(metric: any) {
+    this.fleetMetric = metric;
+    this.renderHeatmap();
+  }
+
+  onTimeRangeChange(range: any) {
+    this.timeRange = range;
+    this.timeBuckets = this.generateTimeBucketsForDays(
+      range === '1d' ? 1 : range === '3d' ? 3 : 7
+    );
+    this.renderHeatmap();
+    this.renderComparison();
+  }
+
+  toggleServer(s: string) {
+    this.excludedServers.has(s)
+      ? this.excludedServers.delete(s)
+      : this.excludedServers.add(s);
+
+    this.renderHeatmap();
+    this.renderComparison();
+  }
+
+  applyCategory() {
+    this.visibleServers = this.serverCatalog[this.selectedCategory];
+    this.renderHeatmap();
+    this.renderComparison();
+  }
+
+  getActiveServers() {
+    return this.visibleServers.filter(s => !this.excludedServers.has(s));
+  }
+
+  /* -----------------------------
+     TIME BUCKETS (YOUR STYLE)
+  ------------------------------ */
+
+  generateTimeBucketsForDays(days: number): string[] {
+    const buckets: string[] = [];
+    const now = new Date();
+
+    for (let d = days - 1; d >= 0; d--) {
+      const day = new Date(now);
+      day.setDate(now.getDate() - d);
+
+      for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 5) {
+          if (m === 0) {
+            if (h === 0) {
+              buckets.push(
+                day.toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short'
+                }) + ' 00:00'
+              );
+            } else {
+              buckets.push(`${String(h).padStart(2, '0')}:00`);
+            }
           } else {
-            buckets.push(`${String(h).padStart(2, '0')}:00`);
+            buckets.push('');
           }
-        } else {
-          buckets.push('');
         }
       }
     }
+    return buckets;
   }
 
-  return buckets;
+  /* -----------------------------
+     HEATMAP
+  ------------------------------ */
+
+  renderHeatmap() {
+    const el = document.getElementById('heatmap');
+    if (!this.heatmapChart) {
+      this.heatmapChart = echarts.init(el!);
+    }
+
+    const active = this.getActiveServers();
+    const factor = this.timeRange === '1d' ? 1 : this.timeRange === '3d' ? 6 : 12;
+    const data: any[] = [];
+
+    active.forEach((s, sIdx) => {
+      let values = this.metrics[s][this.fleetMetric];
+      if (factor > 1) values = this.aggregate(values, factor);
+
+      values.forEach((v, tIdx) => {
+        data.push([tIdx, sIdx, v]);
+      });
+    });
+
+    this.heatmapChart.setOption({
+      tooltip: {
+        formatter: (p: any) =>
+          `<b>${active[p.value[1]]}</b><br/>
+           ${this.fleetMetricLabels[this.fleetMetric]}: ${p.value[2]}%`
+      },
+      grid: { left: 120, right: 20, bottom: 40 },
+      xAxis: { type: 'category', data: this.timeBuckets },
+      yAxis: { type: 'category', data: active },
+      visualMap: {
+        min: 0,
+        max: 100,
+        orient: 'horizontal',
+        bottom: 0,
+        inRange: {
+          color: ['#16a34a', '#facc15', '#fb923c', '#dc2626']
+        }
+      },
+      series: [{ type: 'heatmap', data }]
+    });
+
+    this.heatmapChart.off('click');
+    this.heatmapChart.on('click', (p: any) =>
+      this.openDeepDive(active[p.value[1]])
+    );
+  }
+
+  /* -----------------------------
+     COMPARISON
+  ------------------------------ */
+
+  renderComparison() {
+    const el = document.getElementById('comparison');
+    if (!this.comparisonChart) {
+      this.comparisonChart = echarts.init(el!);
+    }
+
+    const active = this.getActiveServers();
+    const factor = this.timeRange === '1d' ? 1 : this.timeRange === '3d' ? 6 : 12;
+
+    this.comparisonChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: this.timeBuckets },
+      yAxis: { type: 'value', max: 100 },
+      series: active.map(s => ({
+        name: s,
+        type: 'line',
+        data: factor > 1
+          ? this.aggregate(this.metrics[s].p95, factor)
+          : this.metrics[s].p95,
+        lineStyle: { opacity: 0.4 }
+      }))
+    });
+  }
+
+  /* -----------------------------
+     DEEP DIVE (ALWAYS 1 DAY)
+  ------------------------------ */
+
+  openDeepDive(server: string) {
+    this.selectedServer = server;
+
+    setTimeout(() => {
+      const el = document.getElementById('deepDive');
+      if (!this.deepDiveChart) {
+        this.deepDiveChart = echarts.init(el!);
+      }
+
+      this.deepDiveChart.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['usr', 'sys', 'iowait', 'p95'] },
+        xAxis: {
+          type: 'category',
+          data: this.generateTimeBucketsForDays(1)
+        },
+        yAxis: { type: 'value', max: 100 },
+        series: [
+          { name: 'usr', type: 'line', data: this.metrics[server].usr },
+          { name: 'sys', type: 'line', data: this.metrics[server].sys },
+          { name: 'iowait', type: 'line', data: this.metrics[server].iowait },
+          {
+            name: 'p95',
+            type: 'line',
+            data: this.metrics[server].p95,
+            lineStyle: { width: 3, type: 'dashed' }
+          }
+        ]
+      });
+    });
+  }
+
+  /* -----------------------------
+     HELPERS
+  ------------------------------ */
+
+  aggregate(arr: number[], factor: number): number[] {
+    const out = [];
+    for (let i = 0; i < arr.length; i += factor) {
+      const slice = arr.slice(i, i + factor);
+      out.push(slice.reduce((a, b) => a + b, 0) / slice.length);
+    }
+    return out;
+  }
+
+  fake(n: number): number[] {
+    return Array.from({ length: n }, () => Math.floor(20 + Math.random() * 60));
+  }
 }
 
 
 
 
 
-// Today
-this.timeBuckets = this.generateTimeBucketsForDays(1);
-
-// Last 3 days
-this.timeBuckets = this.generateTimeBucketsForDays(3);
-
-// Last 7 days
-this.timeBuckets = this.generateTimeBucketsForDays(7);
 
 
+<div class="dashboard">
+
+  <div class="controls">
+    <label>
+      Category:
+      <select (change)="onCategoryChange($event.target.value)">
+        <option value="APP">App</option>
+        <option value="DEV">Dev</option>
+        <option value="GATEWAY">Gateway</option>
+        <option value="DB">DB</option>
+      </select>
+    </label>
+
+    <label>
+      Metric:
+      <select (change)="onFleetMetricChange($event.target.value)">
+        <option value="p95">95p</option>
+        <option value="usr">User</option>
+        <option value="sys">System</option>
+        <option value="iowait">IO Wait</option>
+      </select>
+    </label>
+
+    <label>
+      Time:
+      <select (change)="onTimeRangeChange($event.target.value)">
+        <option value="1d">Today</option>
+        <option value="3d">3 Days</option>
+        <option value="7d">7 Days</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="server-strip">
+    <span *ngFor="let s of visibleServers"
+          (click)="toggleServer(s)"
+          [class.excluded]="excludedServers.has(s)">
+      {{ s }}
+    </span>
+  </div>
+
+  <div class="card">
+    <h3>Fleet Overview – {{ fleetMetricLabels[fleetMetric] }}</h3>
+    <div id="heatmap" class="chart heatmap"></div>
+  </div>
+
+  <div class="card">
+    <h3>Comparison – 95th Percentile</h3>
+    <div id="comparison" class="chart"></div>
+  </div>
+
+  <div class="card" *ngIf="selectedServer">
+    <h3>Deep Dive – {{ selectedServer }}</h3>
+    <div id="deepDive" class="chart"></div>
+  </div>
+
+</div>
 
 
 
