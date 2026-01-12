@@ -1,0 +1,52 @@
+generateTimeBucketsForDays(days: number): string[] {
+  const buckets: string[] = [];
+  const now = new Date();
+
+  for (let d = days - 1; d >= 0; d--) {
+    const day = new Date(now);
+    day.setDate(now.getDate() - d);
+    day.setHours(0, 0, 0, 0);
+
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 5) {
+
+        // Show label only at hour boundary
+        if (m === 0) {
+          // Midnight → show date + time
+          if (h === 0) {
+            buckets.push(
+              day.toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short'
+              }) + ' 00:00'
+            );
+          } else {
+            buckets.push(`${String(h).padStart(2, '0')}:00`);
+          }
+        } else {
+          buckets.push('');
+        }
+      }
+    }
+  }
+
+  return buckets;
+}
+
+
+
+
+
+// Today
+this.timeBuckets = this.generateTimeBucketsForDays(1);
+
+// Last 3 days
+this.timeBuckets = this.generateTimeBucketsForDays(3);
+
+// Last 7 days
+this.timeBuckets = this.generateTimeBucketsForDays(7);
+
+
+
+
+
