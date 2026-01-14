@@ -81,3 +81,23 @@ sub time_to_seconds {
     my ($h, $m, $s) = split /[:.]/, $t, 4;
     return ($h * 3600) + ($m * 60) + $s;
 }
+
+
+
+
+
+sub time_to_microseconds {
+    my ($t) = @_;
+
+    # HH:MM:SS.micro
+    my ($h, $m, $s, $us) = $t =~ /(\d{2}):(\d{2}):(\d{2})\.(\d+)/;
+
+    # normalize microseconds to 6 digits
+    $us = substr($us . "000000", 0, 6);
+
+    return
+          ($h * 3600 * 1_000_000)
+        + ($m * 60   * 1_000_000)
+        + ($s * 1_000_000)
+        +  $us;
+}
