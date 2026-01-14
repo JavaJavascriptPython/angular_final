@@ -101,3 +101,120 @@ sub time_to_microseconds {
         + ($s * 1_000_000)
         +  $us;
 }
+
+
+
+
+
+
+
+
+
+
+_---------
+
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+# -------------------------
+# Arguments
+# -------------------------
+my $gz_file     = shift or die "Usage: $0 file.gz output.csv\n";
+my $output_file = shift || "response_time.csv";
+
+# -------------------------
+# Output file
+# -------------------------
+open my $OUT, ">", $output_file
+    or die "Cannot open $output_file for writing: $!";
+
+print $OUT "thread_id,received_time,sending_time,response_time_microseconds\n";
+
+# -------------------------
+# Open gz file (no modules)
+# -------------------------
+open my $FH, "-|", "gunzip -c $gz_file"
+    or die "Cannot open gz file: $!";
+
+# -------------------------
+# Per-thread state
+# -------------------------
+my %thread;
+
+while (my $line = <$FH>) {
+    chomp $line;
+
+    # Extract timestamp
+    my ($time_str) = $line =~ /^(\d{2}:\d{2}:\d{2}\.\d+)/ or next;
+    my $time_us = time_to_microseconds($time_str);
+
+    # Extract thread id (T-xxxx)
+    my ($tid) = $line =~ /\b(T-\d+)\b/ or next;
+
+    # Start of thread scope
+    if ($line =~ /SSL ACCEPT SUCCESS/i) {
+        $thread{$tid} = {
+            active => 1,
+            recv_q => [],
+        };
+        next;
+    }
+
+    # Ignore if thread not active
+    next unless exists $thread{$tid} && $thread{$tid}->{active};
+
+    # Received input
+    if ($line =~ /Received input client/i) {
+        push @{ $thread{$tid}->{recv_q} }, {
+            time_str => $time_str,
+            time_us  => $time_us,
+        };
+        next;
+    }
+
+    # Sending response
+    if ($line =~ /Sending response/i) {
+
+        my $recv = shift @{ $thread{$tid}->{recv_q} };
+        next unless $recv;   # safety
+
+        my $diff_us = $time_us - $recv->{time_us};
+
+        printf $OUT "%s,%s,%s,%d\n",
+            $tid,
+            $recv->{time_str},
+            $time_str,
+            $diff_us;
+
+        next;
+    }
+
+    # Close thread scope
+    if ($line =~ /Close connections/i) {
+        delete $thread{$tid};
+    }
+}
+
+close $FH;
+close $OUT;
+
+print "Response time report written to: $output_file\n";
+
+# ------------------------------------------------
+# Convert HH:MM:SS.micro → microseconds since 00:00
+# ------------------------------------------------
+sub time_to_microseconds {
+    my ($t) = @_;
+
+    my ($h, $m, $s, $us) = $t =~ /(\d{2}):(\d{2}):(\d{2})\.(\d+)/;
+
+    # Normalize microseconds to 6 digits
+    $us = substr($us . "000000", 0, 6);
+
+    return
+          ($h * 3600 * 1_000_000)
+        + ($m * 60   * 1_000_000)
+        + ($s * 1_000_000)
+        +  $us;
+}
