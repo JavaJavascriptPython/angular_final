@@ -1,0 +1,83 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+my $gz_file     = shift or die "Usage: $0 file.gz\n";
+my $output_file = shift || "response_time.csv";
+
+open my $OUT, ">", $output_file or die "Cannot write $output_file: $!";
+
+print $OUT "thread_id,received_time,sending_time,response_time_seconds\n";
+
+# Open gz without Perl modules
+open my $FH, "-|", "gunzip -c $gz_file"
+    or die "Cannot open gz file: $!";
+
+my %thread;
+
+while (my $line = <$FH>) {
+    chomp $line;
+
+    # Time at beginning
+    my ($time_str) = $line =~ /^(\d{2}:\d{2}:\d{2}\.\d+)/ or next;
+    my $time_sec = time_to_seconds($time_str);
+
+    # Thread id
+    my ($tid) = $line =~ /\b(T-\d+)\b/ or next;
+
+    # Start tracking
+    if ($line =~ /SSL ACCEPT SUCCESS/i) {
+        $thread{$tid} = {
+            active   => 1,
+            recv_q   => [],
+        };
+        next;
+    }
+
+    next unless exists $thread{$tid} && $thread{$tid}->{active};
+
+    # Received input
+    if ($line =~ /Received input client/i) {
+        push @{ $thread{$tid}->{recv_q} }, {
+            time_str => $time_str,
+            time_sec => $time_sec,
+        };
+        next;
+    }
+
+    # Sending response
+    if ($line =~ /Sending response/i) {
+
+        my $recv = shift @{ $thread{$tid}->{recv_q} };
+        next unless $recv;   # safety
+
+        my $diff = $time_sec - $recv->{time_sec};
+
+        printf $OUT "%s,%s,%s,%.6f\n",
+            $tid,
+            $recv->{time_str},
+            $time_str,
+            $diff;
+
+        next;
+    }
+
+    # Close thread
+    if ($line =~ /Close connections/i) {
+        delete $thread{$tid};
+    }
+}
+
+close $FH;
+close $OUT;
+
+print "Output written to $output_file\n";
+
+# ----------------------------------
+# Convert HH:MM:SS.micro → seconds
+# ----------------------------------
+sub time_to_seconds {
+    my ($t) = @_;
+    my ($h, $m, $s) = split /[:.]/, $t, 4;
+    return ($h * 3600) + ($m * 60) + $s;
+}
