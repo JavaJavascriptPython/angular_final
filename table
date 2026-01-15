@@ -1,0 +1,135 @@
+import { Component, OnInit, ViewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { MatTableDataSource } from '@angular/material';
+
+export interface TableRow {
+  server: string;
+  cpu: number;
+  mem: number;
+  disk: number;
+  io: number;
+  network: number;
+  timestamp: string;
+}
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html'
+})
+export class AppComponent implements OnInit {
+
+  displayedColumns: string[] = [
+    'server',
+    'cpu',
+    'mem',
+    'disk',
+    'io',
+    'network',
+    'timestamp'
+  ];
+
+  dataSource = new MatTableDataSource<TableRow>();
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit() {
+    this.loadCSV();
+  }
+
+  loadCSV() {
+    this.http
+      .get('assets/data.csv', { responseType: 'text' })
+      .subscribe(csv => {
+        this.dataSource.data = this.parseCSV(csv);
+      });
+  }
+
+  parseCSV(csv: string): TableRow[] {
+    const lines = csv.split('\n').filter(l => l.trim());
+    return lines.slice(1).map(line => {
+      const v = line.split(',');
+      return {
+        server: v[0],
+        cpu: +v[1],
+        mem: +v[2],
+        disk: +v[3],
+        io: +v[4],
+        network: +v[5],
+        timestamp: v[6]
+      };
+    });
+  }
+
+  applyFilter(filterValue: string) {
+    this.dataSource.filter = filterValue.trim().toLowerCase();
+  }
+}
+
+
+
+
+
+
+<mat-form-field appearance="outline" style="width: 300px;">
+  <mat-label>Search</mat-label>
+  <input
+    matInput
+    (keyup)="applyFilter($event.target.value)"
+    placeholder="Search table">
+</mat-form-field>
+
+<table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
+
+  <ng-container matColumnDef="server">
+    <th mat-header-cell *matHeaderCellDef> Server </th>
+    <td mat-cell *matCellDef="let row"> {{row.server}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="cpu">
+    <th mat-header-cell *matHeaderCellDef> CPU </th>
+    <td mat-cell *matCellDef="let row"> {{row.cpu}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="mem">
+    <th mat-header-cell *matHeaderCellDef> Memory </th>
+    <td mat-cell *matCellDef="let row"> {{row.mem}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="disk">
+    <th mat-header-cell *matHeaderCellDef> Disk </th>
+    <td mat-cell *matCellDef="let row"> {{row.disk}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="io">
+    <th mat-header-cell *matHeaderCellDef> IO </th>
+    <td mat-cell *matCellDef="let row"> {{row.io}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="network">
+    <th mat-header-cell *matHeaderCellDef> Network </th>
+    <td mat-cell *matCellDef="let row"> {{row.network}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="timestamp">
+    <th mat-header-cell *matHeaderCellDef> Time </th>
+    <td mat-cell *matCellDef="let row"> {{row.timestamp}} </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>
+
+
+
+
+
+
+import { MatTableModule, MatInputModule, MatFormFieldModule } from '@angular/material';
+
+@NgModule({
+  imports: [
+    MatTableModule,
+    MatInputModule,
+    MatFormFieldModule
+  ]
+})
