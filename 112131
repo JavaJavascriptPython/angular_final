@@ -167,3 +167,16 @@ parseCSV(csv: string): any[] {
     width: 100%;
   }
 }
+
+
+
+
+
+this.dataSource.filterPredicate = (data, filter) => {
+  const terms = filter.split(' ').filter(t => t);
+
+  const searchableText =
+    (data.server + ' ' + data.timestamp).toLowerCase();
+
+  return terms.every(term => searchableText.includes(term));
+};
