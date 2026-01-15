@@ -1,0 +1,169 @@
+parseCSV(csv: string): any[] {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentValue = '';
+  let insideQuotes = false;
+
+  for (let i = 0; i < csv.length; i++) {
+    const char = csv[i];
+    const nextChar = csv[i + 1];
+
+    if (char === '"' && insideQuotes && nextChar === '"') {
+      // Escaped quote
+      currentValue += '"';
+      i++;
+    } else if (char === '"') {
+      insideQuotes = !insideQuotes;
+    } else if (char === ',' && !insideQuotes) {
+      currentRow.push(currentValue.trim());
+      currentValue = '';
+    } else if (char === '\n' && !insideQuotes) {
+      currentRow.push(currentValue.trim());
+      rows.push(currentRow);
+      currentRow = [];
+      currentValue = '';
+    } else {
+      currentValue += char;
+    }
+  }
+
+  // push last value
+  if (currentValue.length || currentRow.length) {
+    currentRow.push(currentValue.trim());
+    rows.push(currentRow);
+  }
+
+  // Convert rows to objects (skip header)
+  return rows.slice(1).map(r => ({
+    server: r[0],
+    cpu: +r[1],
+    mem: +r[2],
+    disk: +r[3],
+    io: +r[4],
+    network: +r[5],
+    timestamp: r[6]
+  }));
+}
+
+
+
+
+<div class="page-wrapper">
+
+  <div class="table-card">
+
+    <div class="table-header">
+      <div class="title">
+        Branch Performance
+      </div>
+
+      <mat-form-field appearance="outline" class="search-box">
+        <mat-label>Search</mat-label>
+        <input
+          matInput
+          (keyup)="applyFilter($event.target.value)"
+          placeholder="Search branch, cpu, time">
+      </mat-form-field>
+    </div>
+
+    <table mat-table [dataSource]="dataSource" class="mat-table-custom mat-elevation-z2">
+      <!-- your columns stay unchanged -->
+    </table>
+
+  </div>
+
+</div>
+
+
+
+
+
+
+/* Page background */
+.page-wrapper {
+  background: #f4f6f9;
+  min-height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+/* Card container */
+.table-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px 20px 20px;
+  max-width: 1200px;
+  margin: auto;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.08),
+    0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* Header area */
+.table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+/* Title */
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+/* Search box */
+.search-box {
+  width: 260px;
+}
+
+/* Table tweaks */
+.mat-table-custom {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Header row */
+.mat-header-row {
+  background: #fafafa;
+}
+
+/* Header cells */
+.mat-header-cell {
+  font-weight: 600;
+  color: #37474f;
+  font-size: 13px;
+}
+
+/* Data cells */
+.mat-cell {
+  font-size: 13px;
+  color: #455a64;
+}
+
+/* Row hover */
+.mat-row:hover {
+  background: #f5f7fa;
+  cursor: pointer;
+}
+
+/* Zebra striping */
+.mat-row:nth-child(even) {
+  background: #fcfcfc;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+}
