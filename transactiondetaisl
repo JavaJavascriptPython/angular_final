@@ -1,0 +1,153 @@
+import { BrowserModule } from '@angular/platform-browser';
+import { NgModule } from '@angular/core';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { FormsModule } from '@angular/forms';
+
+import { MatTableModule } from '@angular/material/table';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+
+import { AppComponent } from './app.component';
+
+@NgModule({
+  declarations: [AppComponent],
+  imports: [
+    BrowserModule,
+    BrowserAnimationsModule,
+    FormsModule,
+    MatTableModule,
+    MatButtonToggleModule,
+    MatInputModule,
+    MatFormFieldModule
+  ],
+  bootstrap: [AppComponent]
+})
+export class AppModule {}
+
+
+
+
+
+
+
+import { Component } from '@angular/core';
+
+interface TransactionCode {
+  code: string;
+  name: string;
+  category: 'CASH' | 'CLEARING' | 'TRANSFER';
+}
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css']
+})
+export class AppComponent {
+
+  selectedCategory = 'ALL';
+  searchText = '';
+
+  displayedColumns = ['code', 'name', 'category'];
+
+  allTransactions: TransactionCode[] = [
+    { code: 'C001', name: 'Cash Deposit', category: 'CASH' },
+    { code: 'C002', name: 'Cash Withdrawal', category: 'CASH' },
+
+    { code: 'CL01', name: 'Cheque Clearing', category: 'CLEARING' },
+    { code: 'CL02', name: 'Outward Clearing', category: 'CLEARING' },
+
+    { code: 'T001', name: 'NEFT Transfer', category: 'TRANSFER' },
+    { code: 'T002', name: 'RTGS Transfer', category: 'TRANSFER' }
+  ];
+
+  get filteredTransactions(): TransactionCode[] {
+    return this.allTransactions.filter(t => {
+
+      const categoryMatch =
+        this.selectedCategory === 'ALL' ||
+        t.category === this.selectedCategory;
+
+      const searchMatch =
+        !this.searchText ||
+        t.code.toLowerCase().includes(this.searchText.toLowerCase()) ||
+        t.name.toLowerCase().includes(this.searchText.toLowerCase());
+
+      return categoryMatch && searchMatch;
+    });
+  }
+}
+
+
+
+
+
+
+
+
+<div class="container">
+
+  <!-- Search Box -->
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>Search transaction</mat-label>
+    <input matInput
+           [(ngModel)]="searchText"
+           placeholder="Search by code or name">
+  </mat-form-field>
+
+  <!-- Category Filter -->
+  <mat-button-toggle-group
+    [(ngModel)]="selectedCategory"
+    appearance="legacy">
+
+    <mat-button-toggle value="ALL">All</mat-button-toggle>
+    <mat-button-toggle value="CASH">Cash</mat-button-toggle>
+    <mat-button-toggle value="CLEARING">Clearing</mat-button-toggle>
+    <mat-button-toggle value="TRANSFER">Transfer</mat-button-toggle>
+
+  </mat-button-toggle-group>
+
+  <!-- Table -->
+  <table mat-table
+         [dataSource]="filteredTransactions"
+         class="mat-elevation-z1 full-width">
+
+    <ng-container matColumnDef="code">
+      <th mat-header-cell *matHeaderCellDef>Code</th>
+      <td mat-cell *matCellDef="let row">{{ row.code }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Name</th>
+      <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="category">
+      <th mat-header-cell *matHeaderCellDef>Category</th>
+      <td mat-cell *matCellDef="let row">{{ row.category }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+
+  </table>
+
+</div>
+
+
+
+
+
+.container {
+  padding: 16px;
+}
+
+.full-width {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+mat-button-toggle-group {
+  margin-bottom: 12px;
+}
