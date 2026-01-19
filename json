@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Viewer & Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 1200px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .toolbar {
+            padding: 15px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .editor-panel, .tree-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .editor-panel {
+            border-right: 1px solid #dee2e6;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        textarea {
+            flex: 1;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            border-color: #667eea;
+        }
+
+        .tree-view {
+            flex: 1;
+            overflow: auto;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 15px;
+            background: #f8f9fa;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .tree-node {
+            margin-left: 20px;
+        }
+
+        .tree-key {
+            color: #0066cc;
+            font-weight: bold;
+        }
+
+        .tree-string {
+            color: #008000;
+        }
+
+        .tree-number {
+            color: #ff6600;
+        }
+
+        .tree-boolean {
+            color: #cc00cc;
+        }
+
+        .tree-null {
+            color: #999999;
+            font-style: italic;
+        }
+
+        .tree-bracket {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .toggle {
+            cursor: pointer;
+            user-select: none;
+            color: #667eea;
+            margin-right: 5px;
+        }
+
+        .status {
+            padding: 10px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .search-box {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+            }
+            
+            .editor-panel {
+                border-right: none;
+                border-bottom: 1px solid #dee2e6;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>JSON Viewer & Editor</h1>
+            <p>View, edit, validate, and format JSON data offline</p>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn btn-primary" onclick="formatJSON()">Format</button>
+            <button class="btn btn-secondary" onclick="minifyJSON()">Minify</button>
+            <button class="btn btn-success" onclick="validateJSON()">Validate</button>
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Import</button>
+            <button class="btn btn-primary" onclick="exportJSON()">Export</button>
+            <button class="btn btn-danger" onclick="clearAll()">Clear</button>
+            <input type="text" class="search-box" id="searchBox" placeholder="Search keys..." oninput="searchJSON()">
+        </div>
+
+        <div class="content">
+            <div class="editor-panel">
+                <div class="panel-title">JSON Editor</div>
+                <textarea id="jsonInput" placeholder="Paste or type your JSON here...">{
+  "name": "JSON Viewer",
+  "version": "1.0",
+  "features": [
+    "Syntax highlighting",
+    "Tree view",
+    "Validation",
+    "Format & Minify"
+  ],
+  "settings": {
+    "offline": true,
+    "autoSave": false
+  }
+}</textarea>
+            </div>
+
+            <div class="tree-panel">
+                <div class="panel-title">Tree View</div>
+                <div class="tree-view" id="treeView"></div>
+            </div>
+        </div>
+
+        <div class="status" id="status">Ready</div>
+
+        <input type="file" id="fileInput" accept=".json" onchange="importFile(event)">
+    </div>
+
+    <script>
+        const jsonInput = document.getElementById('jsonInput');
+        const treeView = document.getElementById('treeView');
+        const status = document.getElementById('status');
+        const searchBox = document.getElementById('searchBox');
+
+        let currentJSON = null;
+
+        // Initialize with default JSON
+        parseAndDisplay();
+
+        jsonInput.addEventListener('input', parseAndDisplay);
+
+        function parseAndDisplay() {
+            try {
+                const text = jsonInput.value.trim();
+                if (!text) {
+                    treeView.innerHTML = '<span style="color: #999;">No JSON data</span>';
+                    setStatus('Empty', 'normal');
+                    return;
+                }
+
+                currentJSON = JSON.parse(text);
+                displayTree(currentJSON);
+                setStatus('Valid JSON', 'success');
+            } catch (e) {
+                treeView.innerHTML = `<span style="color: #dc3545;">Error: ${e.message}</span>`;
+                setStatus(`Error: ${e.message}`, 'error');
+            }
+        }
+
+        function displayTree(obj, container = treeView, level = 0) {
+            container.innerHTML = '';
+            const tree = createTreeNode(obj, level);
+            container.appendChild(tree);
+        }
+
+        function createTreeNode(obj, level = 0) {
+            const div = document.createElement('div');
+            
+            if (obj === null) {
+                div.innerHTML = '<span class="tree-null">null</span>';
+                return div;
+            }
+
+            if (typeof obj !== 'object') {
+                div.innerHTML = formatValue(obj);
+                return div;
+            }
+
+            const isArray = Array.isArray(obj);
+            const entries = isArray ? obj.entries() : Object.entries(obj);
+            const isEmpty = isArray ? obj.length === 0 : Object.keys(obj).length === 0;
+
+            if (isEmpty) {
+                div.innerHTML = isArray ? '<span class="tree-bracket">[]</span>' : '<span class="tree-bracket">{}</span>';
+                return div;
+            }
+
+            const toggle = document.createElement('span');
+            toggle.className = 'toggle';
+            toggle.textContent = '▼';
+            div.appendChild(toggle);
+
+            const bracket = document.createElement('span');
+            bracket.className = 'tree-bracket';
+            bracket.textContent = isArray ? '[' : '{';
+            div.appendChild(bracket);
+
+            const childContainer = document.createElement('div');
+            childContainer.className = 'tree-node';
+
+            for (const [key, value] of entries) {
+                const line = document.createElement('div');
+                
+                if (!isArray) {
+                    const keySpan = document.createElement('span');
+                    keySpan.className = 'tree-key';
+                    keySpan.textContent = `"${key}"`;
+                    line.appendChild(keySpan);
+                    line.appendChild(document.createTextNode(': '));
+                }
+
+                if (value !== null && typeof value === 'object') {
+                    line.appendChild(createTreeNode(value, level + 1));
+                } else {
+                    const valueSpan = document.createElement('span');
+                    valueSpan.innerHTML = formatValue(value);
+                    line.appendChild(valueSpan);
+                }
+
+                childContainer.appendChild(line);
+            }
+
+            div.appendChild(childContainer);
+
+            const closeBracket = document.createElement('div');
+            closeBracket.className = 'tree-bracket';
+            closeBracket.textContent = isArray ? ']' : '}';
+            div.appendChild(closeBracket);
+
+            toggle.onclick = function() {
+                const isCollapsed = childContainer.style.display === 'none';
+                childContainer.style.display = isCollapsed ? 'block' : 'none';
+                closeBracket.style.display = isCollapsed ? 'block' : 'none';
+                toggle.textContent = isCollapsed ? '▼' : '▶';
+            };
+
+            return div;
+        }
+
+        function formatValue(value) {
+            if (typeof value === 'string') {
+                return `<span class="tree-string">"${escapeHtml(value)}"</span>`;
+            } else if (typeof value === 'number') {
+                return `<span class="tree-number">${value}</span>`;
+            } else if (typeof value === 'boolean') {
+                return `<span class="tree-boolean">${value}</span>`;
+            } else if (value === null) {
+                return '<span class="tree-null">null</span>';
+            }
+            return String(value);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatJSON() {
+            try {
+                const obj = JSON.parse(jsonInput.value);
+                jsonInput.value = JSON.stringify(obj, null, 2);
+                parseAndDisplay();
+                setStatus('JSON formatted successfully', 'success');
+            } catch (e) {
+                setStatus(`Cannot format: ${e.message}`, 'error');
+            }
+        }
+
+        function minifyJSON() {
+            try {
+                const obj = JSON.parse(jsonInput.value);
+                jsonInput.value = JSON.stringify(obj);
+                parseAndDisplay();
+                setStatus('JSON minified successfully', 'success');
+            } catch (e) {
+                setStatus(`Cannot minify: ${e.message}`, 'error');
+            }
+        }
+
+        function validateJSON() {
+            try {
+                JSON.parse(jsonInput.value);
+                setStatus('✓ Valid JSON', 'success');
+            } catch (e) {
+                setStatus(`✗ Invalid JSON: ${e.message}`, 'error');
+            }
+        }
+
+        function importFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                jsonInput.value = e.target.result;
+                parseAndDisplay();
+                setStatus(`File "${file.name}" imported`, 'success');
+            };
+            reader.readAsText(file);
+        }
+
+        function exportJSON() {
+            try {
+                const obj = JSON.parse(jsonInput.value);
+                const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'data.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                setStatus('JSON exported successfully', 'success');
+            } catch (e) {
+                setStatus(`Cannot export: ${e.message}`, 'error');
+            }
+        }
+
+        function clearAll() {
+            if (confirm('Are you sure you want to clear all content?')) {
+                jsonInput.value = '';
+                treeView.innerHTML = '<span style="color: #999;">No JSON data</span>';
+                searchBox.value = '';
+                setStatus('Cleared', 'normal');
+            }
+        }
+
+        function searchJSON() {
+            const query = searchBox.value.toLowerCase();
+            if (!query || !currentJSON) {
+                parseAndDisplay();
+                return;
+            }
+
+            const filtered = filterJSON(currentJSON, query);
+            if (filtered !== null) {
+                displayTree(filtered);
+                setStatus(`Search results for "${query}"`, 'success');
+            } else {
+                treeView.innerHTML = `<span style="color: #999;">No results found for "${query}"</span>`;
+                setStatus('No matches found', 'normal');
+            }
+        }
+
+        function filterJSON(obj, query) {
+            if (typeof obj !== 'object' || obj === null) {
+                return null;
+            }
+
+            if (Array.isArray(obj)) {
+                const filtered = obj.map(item => filterJSON(item, query)).filter(item => item !== null);
+                return filtered.length > 0 ? filtered : null;
+            }
+
+            const result = {};
+            let hasMatch = false;
+
+            for (const [key, value] of Object.entries(obj)) {
+                if (key.toLowerCase().includes(query)) {
+                    result[key] = value;
+                    hasMatch = true;
+                } else if (typeof value === 'object' && value !== null) {
+                    const filtered = filterJSON(value, query);
+                    if (filtered !== null) {
+                        result[key] = filtered;
+                        hasMatch = true;
+                    }
+                }
+            }
+
+            return hasMatch ? result : null;
+        }
+
+        function setStatus(message, type = 'normal') {
+            status.textContent = message;
+            status.className = 'status';
+            if (type === 'error') {
+                status.classList.add('error');
+            } else if (type === 'success') {
+                status.classList.add('success');
+            }
+        }
+    </script>
+</body>
+</html>
