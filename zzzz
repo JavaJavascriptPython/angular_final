@@ -1,0 +1,40 @@
+fetchData() {
+  this.http.get<any>('YOUR_API_URL_HERE')
+    .subscribe(res => {
+      this.dataSource.data = this.transformResponse(res);
+    });
+}
+
+
+
+
+transformResponse(res: any): TableRow[] {
+  const rows: TableRow[] = [];
+
+  const length = res.branch.length; // number of rows
+
+  for (let i = 0; i < length; i++) {
+    rows.push({
+      branch: res.branch[i],
+      server: res.server[i],
+      cpu: res.cpu[i],
+      memory: res.memory[i],
+      disk: res.disk[i],
+      io: res.io[i],
+      network: res.network[i],
+      timestamp: res.timestamp[i],
+      status: res.status[i]
+    });
+  }
+
+  return rows;
+}
+
+console.log(this.dataSource.data[0]);
+
+
+if (!res.branch || !res.branch.length) {
+  return [];
+}
+
+
