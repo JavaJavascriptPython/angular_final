@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+my ($file1, $file2) = @ARGV;
+
+die "Usage: perl compare_jobs.pl file1.csv file2.csv\n"
+    unless $file1 && $file2;
+
+open my $fh1, '<', $file1 or die "Cannot open $file1\n";
+open my $fh2, '<', $file2 or die "Cannot open $file2\n";
+
+# Read headers
+my $header1 = <$fh1>;
+my $header2 = <$fh2>;
+
+chomp($header1);
+my @servers = split /,/, $header1;
+shift @servers;   # remove Jobname column
+
+# Read first data lines
+my $line1 = <$fh1>;
+my $line2 = <$fh2>;
+
+print "\n=== JOB COMPARISON REPORT ===\n";
+
+while ($line1 || $line2) {
+
+    chomp($line1) if $line1;
+    chomp($line2) if $line2;
+
+    my @f1 = $line1 ? split(/,/, $line1) : ();
+    my @f2 = $line2 ? split(/,/, $line2) : ();
+
+    my $job1 = $line1 ? $f1[0] : undef;
+    my $job2 = $line2 ? $f2[0] : undef;
+
+    if (defined $job1 && (!defined $job2 || $job1 lt $job2)) {
+        print "❌ Missing in File2: $job1\n";
+        $line1 = <$fh1>;
+    }
+    elsif (defined $job2 && (!defined $job1 || $job2 lt $job1)) {
+        print "❌ Missing in File1: $job2\n";
+        $line2 = <$fh2>;
+    }
+    else {
+        # Job exists in both → compare servers
+        my @diffs;
+        for my $i (1 .. $#f1) {
+            if ($f1[$i] ne $f2[$i]) {
+                push @diffs, "$servers[$i-1]: file1=$f1[$i], file2=$f2[$i]";
+            }
+        }
+
+        if (@diffs) {
+            print "⚠️  Server mismatch for $job1\n";
+            print "    $_\n" for @diffs;
+        }
+
+        $line1 = <$fh1>;
+        $line2 = <$fh2>;
+    }
+}
+
+close $fh1;
+close $fh2;
+
+print "\n=== END OF REPORT ===\n";
